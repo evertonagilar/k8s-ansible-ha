@@ -1,0 +1,40 @@
+---
+- name: Criar a pasta /etc/bash_completion.d
+  file:
+    path: /etc/bash_completion.d
+    state: directory
+    mode: 755
+
+- name: Carregar o arquivo /usr/share/bash-completion/bash_completion
+  shell: source /usr/share/bash-completion/bash_completion
+  args:
+    executable: /bin/bash
+
+- name: Configura bash_completion em /etc/bash.bashrc
+  lineinfile:
+    path: /etc/bash.bashrc
+    line: source /usr/share/bash-completion/bash_completion
+    state: present
+
+- name: Inserir kubectl completion bash em /etc/bash.bashrc
+  lineinfile:
+    path: /etc/bash.bashrc
+    line: source <(kubectl completion bash)
+    state: present
+
+- name: Cadastrar alias k=kubectl em /etc/bash.bashrc
+  lineinfile:
+    path: /etc/bash.bashrc
+    line: alias k=kubectl
+    state: present
+  register: alias_config
+
+- name: Configurar alias k para ter autocomplete
+  lineinfile:
+    path: /etc/bash.bashrc
+    line: complete -o default -F __start_kubectl k
+    state: present
+
+- name: Definir alias k=kubectl no shell
+  shell: alias k=kubectl
+  when: alias_config.changed

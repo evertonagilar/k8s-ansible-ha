@@ -1,0 +1,6 @@
+- name: Desativar o Transparent Huge Pages (THP)
+  hosts: controlplane worker
+  become: yes
+  roles:
+    - disable-thp
+

@@ -1,0 +1,125 @@
+#!/bin/bash
+
+##############################################################################################################
+# NÃO EDITAR!!! Provisionado com Ansible
+#
+# Autor: Everton de Vargas Agilar <evertonagilar@ufsm.br>
+#
+# Objetivo: Habilitar o DNAT para o novo proxy reverso.
+#
+#
+## Histórico de modificações
+#
+# Data       |  Quem           |  Mensagem
+# ----------------------------------------------------------------------------------------------------------
+# 17/09/2024  Everton Agilar     Versão inicial
+#
+#############################################################################################################
+
+LOG_FILE='/etc/iptables/cpd-dnat-portal.log'
+CURRENT_DATE=$(date '+%d/%m/%Y %H:%M:%S')
+
+# Função para escrever no arquivo de log
+function log(){
+    echo "$CURRENT_DATE: $1" | tee -a "$LOG_FILE"
+}
+
+# Função para adicionar regras DNAT
+start_dnat() {
+    log "Iniciando proxy dnat"
+
+    log "Criar chains - IPv4"
+    iptables -t nat -N CPD_DNAT_PROXY 2> /dev/null
+    iptables -t nat -N CPD_SNAT_PROXY 2> /dev/null
+    {% if PROXYFW.ipv6_enabled %}
+    log "Criar chains - IPv6"
+    ip6tables -t nat -N CPD_DNAT_PROXY 2> /dev/null
+    ip6tables -t nat -N CPD_SNAT_PROXY 2> /dev/null
+    {% endif %}
+
+    log "Regras de DNAT - IPv4"
+    iptables -t nat -A CPD_DNAT_PROXY -p tcp --dport 443 -j DNAT --to-destination {{ PROXYFW.dnat.ipv4_endpoint }}:443
+    iptables -t nat -A CPD_DNAT_PROXY -p tcp --dport 80 -j DNAT --to-destination {{ PROXYFW.dnat.ipv4_endpoint }}:80
+    iptables -t nat -A CPD_DNAT_PROXY -j RETURN  # Retorna para a chain principal
+
+    {% if PROXYFW.ipv6_enabled %}
+    log "Regras de DNAT - IPv6"
+    ip6tables -t nat -A CPD_DNAT_PROXY -p tcp --dport 443 -j DNAT --to-destination {{ PROXYFW.dnat.ipv6_endpoint }}:443
+    ip6tables -t nat -A CPD_DNAT_PROXY -p tcp --dport 80 -j DNAT --to-destination {{ PROXYFW.dnat.ipv6_endpoint }}:80
+    ip6tables -t nat -A CPD_DNAT_PROXY -j RETURN  # Retorna para a chain principal
+    {% endif %}
+
+    log "Regras de POSTROUTING (mascaramento) - IPv4"
+    iptables -t nat -A CPD_SNAT_PROXY -d {{ PROXYFW.dnat.ipv4_endpoint }}/32 -p tcp --dport 443 -j MASQUERADE
+    iptables -t nat -A CPD_SNAT_PROXY -d {{ PROXYFW.dnat.ipv4_endpoint }}/32 -p tcp --dport 80 -j MASQUERADE
+#    iptables -t nat -A CPD_SNAT_PROXY -d {{ PROXYFW.dnat.ipv4_endpoint }}/32 -p tcp --dport 443 -j SNAT --to-source ${{ PROXYFW.snat.ipv4_endpoint }}
+#    iptables -t nat -A CPD_SNAT_PROXY -d {{ PROXYFW.dnat.ipv4_endpoint }}/32 -p tcp --dport 80 -j SNAT --to-source ${{ PROXYFW.snat.ipv4_endpoint }}
+    iptables -t nat -A CPD_SNAT_PROXY -j RETURN  # Retorna para a chain principal
+
+    {% if PROXYFW.ipv6_enabled %}
+    log "Regras de POSTROUTING (mascaramento) - IPv6"
+    #ip6tables -t nat -A CPD_SNAT_PROXY -d {{ PROXYFW.dnat.ipv6_endpoint }}/128 -p tcp --dport 443 -j MASQUERADE
+    #ip6tables -t nat -A CPD_SNAT_PROXY -d {{ PROXYFW.dnat.ipv6_endpoint }}/128 -p tcp --dport 80 -j MASQUERADE
+    ip6tables -t nat -A CPD_SNAT_PROXY -d {{ PROXYFW.dnat.ipv6_endpoint }}/128 -p tcp --dport 443 -j SNAT --to-source ${{ PROXYFW.snat.ipv6_endpoint }}
+    ip6tables -t nat -A CPD_SNAT_PROXY -d {{ PROXYFW.dnat.ipv6_endpoint }}/128 -p tcp --dport 80 -j SNAT --to-source ${{ PROXYFW.snat.ipv6_endpoint }}
+    ip6tables -t nat -A CPD_SNAT_PROXY -j RETURN  # Retorna para a chain principal
+    {% endif %}
+
+    log "Entra na chain CPD_DNAT_PROXY"
+    iptables -t nat -A PREROUTING -j CPD_DNAT_PROXY
+    {% if PROXYFW.ipv6_enabled %}
+    ip6tables -t nat -A PREROUTING -j CPD_DNAT_PROXY
+    {% endif %}
+
+    log "Entra na chain CPD_SNAT_PROXY"
+    iptables -t nat -A POSTROUTING -j CPD_SNAT_PROXY
+    {% if PROXYFW.ipv6_enabled %}
+    ip6tables -t nat -A POSTROUTING -j CPD_SNAT_PROXY
+    {% endif %}
+
+    log "Regras adicionadas com sucesso"
+}
+
+# Função para limpar regras DNAT
+stop_dnat() {
+    log "Parando o proxy dnat"
+
+    log "Remover jmp para as chains"
+    iptables -t nat -D PREROUTING -j CPD_DNAT_PROXY 2> /dev/null
+    ip6tables -t nat -D PREROUTING -j CPD_DNAT_PROXY 2> /dev/null
+    iptables -t nat -D POSTROUTING -j CPD_SNAT_PROXY 2> /dev/null
+    ip6tables -t nat -D POSTROUTING -j CPD_SNAT_PROXY 2> /dev/null
+
+    log "Flush nas chains"
+    iptables -t nat -F CPD_DNAT_PROXY 2> /dev/null
+    ip6tables -t nat -F CPD_DNAT_PROXY 2> /dev/null
+    iptables -t nat -F CPD_SNAT_PROXY 2> /dev/null
+    ip6tables -t nat -F CPD_SNAT_PROXY 2> /dev/null
+
+    log "Remover chains"
+    iptables -t nat -X CPD_DNAT_PROXY 2> /dev/null
+    ip6tables -t nat -X CPD_DNAT_PROXY 2> /dev/null
+    iptables -t nat -X CPD_SNAT_PROXY 2> /dev/null
+    ip6tables -t nat -X CPD_SNAT_PROXY 2> /dev/null
+}
+
+# Verificar os argumentos
+case "$1" in
+    start)
+        stop_dnat
+        start_dnat
+        ;;
+    stop)
+        stop_dnat
+        ;;
+    restart)
+        stop_dnat
+        start_dnat
+        ;;
+    *)
+        echo "Uso: $0 {start|stop|restart}"
+        exit 1
+        ;;
+esac
+
+exit 0

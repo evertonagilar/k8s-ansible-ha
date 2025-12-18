@@ -1,0 +1,46 @@
+---
+- name: Variáveis utilizadas para provisionar argocd-server
+  debug:
+    msg:
+      - "ansible_host = {{ ansible_host }}"
+      - "ansible_hostname = {{ ansible_hostname }}"
+      - "ARGOCD.url = {{ ARGOCD.url }}"
+      - "ARGOCD.username = {{ ARGOCD.username }}"
+      - "ARGOCD.password = {{ ARGOCD.password }}"
+      - "ARGOCD.ingress.host = {{ ARGOCD.ingress.host }}"
+      - "ARGOCD.ingress.secretName = {{ ARGOCD.ingress.secretName }}"
+      - "ARGOCD.ingress.clusterIssuer = {{ ARGOCD.ingress.clusterIssuer }}"
+      - "ARGOCD.ingress.whitelist = {{ ARGOCD.ingress.whitelist }}"
+      - "ARGOCD.ingress.limitConnections = {{ ARGOCD.ingress.limitConnections }}"
+
+- name: Criar namespace ArgoCD
+  kubernetes.core.k8s:
+    name: argocd
+    api_version: v1
+    kind: Namespace
+    state: present
+
+- name: Provisionar argocd-ingress
+  kubernetes.core.k8s:
+    template: argocd-ingress.yaml
+    state: present
+    wait: yes
+    wait_timeout: 180
+    wait_sleep: 30
+
+- name: Provisionar o ArgoCD no Kubernetes
+  kubernetes.core.k8s:
+    namespace: argocd
+    src: "{{ ARGOCD.url }}"
+    state: present
+
+- name: Provisionar o argocd-netpol
+  kubernetes.core.k8s:
+    namespace: argocd
+    template: argocd-netpol.yaml
+    state: present
+
+#- name: Provisionar argocd-initial-admin-secret
+#  kubernetes.core.k8s:
+#    state: present
+#    template: argocd-initial-admin-secret.yaml

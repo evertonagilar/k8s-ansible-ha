@@ -1,0 +1,22 @@
+---
+- name: Variáveis utilizadas para provisionar sieweb
+  debug:
+    msg:
+      - "ansible_host = {{ ansible_host }}"
+      - "ansible_hostname = {{ ansible_hostname }}"
+      - "NAMESPACE = {{ NAMESPACE }}"
+      - "NOME_APP = {{ NOME_APP }}"
+      - "OVERLAY_PATH = {{ OVERLAY_PATH }}"
+      - "REPO_SIEWEB_TIMER.repo = {{ REPO_SIEWEB_TIMER.repo }}"
+      - "REPO_SIEWEB_TIMER.sync_policy = {{ REPO_SIEWEB_TIMER.sync_policy }}"
+      - "REPO_SIEWEB_TIMER.revision = {{ REPO_SIEWEB_TIMER.revision }}"
+      - "REPO_SIEWEB_TIMER.dest_server = {{ REPO_SIEWEB_TIMER.dest_server }}"
+
+- name: Verificando se app/{{ NOME_APP }} já está provisionado no ArgoCD
+  shell: kubectl -n argocd get app/{{ NOME_APP }} --ignore-not-found
+  register: existe_app
+
+- name: Registrando {{ NOME_APP }} no ArgoCD
+  shell: argocd app create {{ NOME_APP }}  --repo {{ REPO_SIEWEB_TIMER.repo }} --path {{ OVERLAY_PATH }} --dest-server {{ REPO_SIEWEB_TIMER.dest_server }} --dest-namespace {{ NAMESPACE }} --sync-policy {{ REPO_SIEWEB_TIMER.sync_policy }} --revision {{ REPO_SIEWEB_TIMER.revision }}
+  when: existe_app.stdout == ""
+

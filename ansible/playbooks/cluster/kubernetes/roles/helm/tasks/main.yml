@@ -1,0 +1,53 @@
+---
+- name: Variáveis utilizadas para instalar o helm
+  debug:
+    msg:
+      - "VM_HELM_VERSION = {{ VM_HELM_VERSION }}"
+
+- name: Verificar se o helm está instalado
+  command: which /usr/local/bin/helm
+  register: helm_instalado
+  ignore_errors: true
+  no_log: true
+
+- name: Cria pasta temporaria para baixar helm
+  ansible.builtin.tempfile:
+    state: directory
+    prefix: helm_
+  register: helm_temp_dir
+  when: helm_instalado.rc == 1
+
+- name: Fazer download do pacote helm
+  get_url:
+    url: "https://get.helm.sh/helm-{{ VM_HELM_VERSION }}-linux-amd64.tar.gz"
+    dest: "{{ helm_temp_dir.path }}/helm-linux-amd64.tar.gz"
+  when: helm_instalado.rc == 1
+
+- name: Extrair o pacote helm
+  unarchive:
+    src: "{{ helm_temp_dir.path }}/helm-linux-amd64.tar.gz"
+    dest: "{{ helm_temp_dir.path }}"
+    remote_src: yes
+  when: helm_instalado.rc == 1
+
+- name: Mover o binário helm para /usr/local/bin
+  command: mv {{ helm_temp_dir.path }}/linux-amd64/helm /usr/local/bin/helm
+  when: helm_instalado.rc == 1
+
+- name: Tornar o binário helm executável
+  file:
+    path: /usr/local/bin/helm
+    mode: '0755'
+
+- name: Obter a versão do helm
+  command: /usr/local/bin/helm version
+  register: helm_version
+
+- name: Exibir a versão do helm
+  debug:
+    msg: "{{ helm_version.stdout }}"
+
+#- name: Instalar Helm Diff
+#  kubernetes.core.helm_plugin:
+#    plugin_path: "https://github.com/databus23/helm-diff"
+#    state: present

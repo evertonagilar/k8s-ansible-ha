@@ -1,0 +1,44 @@
+---
+- name: Variáveis utilizadas para provisionar dnat-portal
+  debug:
+    msg:
+      - "ansible_host = {{ ansible_host }}"
+      - "ansible_hostname = {{ ansible_hostname }}"
+      - "PROXYFW.ipv6_enabled = {{ PROXYFW.ipv6_enabled }}"
+      - "PROXYFW.interface = {{ PROXYFW.interface }}"
+      - "PROXYFW.dnat.ipv4_endpoint = {{ PROXYFW.dnat.ipv4_endpoint }}"
+      - "PROXYFW.snat.ipv4_endpoint = {{ PROXYFW.snat.ipv4_endpoint }}"
+      - "PROXYFW.dnat.ipv6_endpoint = {{ PROXYFW.dnat.ipv6_endpoint }}"
+      - "PROXYFW.snat.ipv6_endpoint = {{ PROXYFW.snat.ipv6_endpoint }}"
+
+- name: Criar diretório /etc/iptables
+  file:
+    path: /etc/iptables
+    state: directory
+    mode: 0755
+
+- name: Instalar o script cpd-dnat-portal.sh
+  ansible.builtin.template:
+    src: cpd-dnat-portal.sh.j2
+    dest: /etc/iptables/cpd-dnat-portal.sh
+    owner: root
+    mode: '0544'
+
+- name: Instalar o arquivo leiame.txt
+  ansible.builtin.template:
+    src: leiame.txt
+    dest: /etc/iptables/leiame-cpd-dnat-portal.txt
+    mode: '0444'
+
+- name: Instalar o service cpd-dnat-portal.service
+  ansible.builtin.template:
+    src: cpd-dnat-portal.service
+    dest: /etc/systemd/system/cpd-dnat-portal.service
+    mode: '0644'
+
+- name: Reiniciar o service cpd-dnat-portal.service
+  systemd:
+    name: cpd-dnat-portal.service
+    daemon_reload: true
+    enabled: yes
+    state: restarted

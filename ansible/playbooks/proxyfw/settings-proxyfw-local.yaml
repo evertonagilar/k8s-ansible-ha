@@ -1,0 +1,9 @@
+PROXYFW:
+  ipv6_enabled: no
+  interface: eth1
+  dnat:
+    ipv4_endpoint: 192.168.20.16
+    ipv6_endpoint: 2804:d51:4d69:1800:a00:27ff:feba:e0a3
+  snat:
+    ipv4_endpoint: 192.168.20.8
+    ipv6_endpoint: 2804:d51:4d69:1800:a00:27ff:feba:e0a3

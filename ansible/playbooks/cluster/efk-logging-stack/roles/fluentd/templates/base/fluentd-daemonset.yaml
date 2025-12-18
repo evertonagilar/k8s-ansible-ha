@@ -1,0 +1,111 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluentd
+  namespace: efk-logging
+  labels:
+    app: fluentd
+spec:
+  selector:
+    matchLabels:
+      app: fluentd
+  template:
+    metadata:
+      labels:
+        app: fluentd
+    spec:
+      serviceAccountName: fluentd
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          effect: NoSchedule
+        - key: "ufsm.br.proxy-tcp"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
+        - key: "ufsm.br.proxy-reverso"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
+        - key: "ufsm.br.wportal-producao"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
+      initContainers:
+        - name: config-fluentd
+          image: evertonagilar/alpine:1.0.0
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+                cp /fluentd/etc2/fluent.conf /fluentd/etc/fluent.conf
+                cp /fluentd/etc2/kubernetes.conf /fluentd/etc/kubernetes.conf
+                cp /fluentd/etc2/efk-k8s-loadbalancer.conf /fluentd/etc/efk-k8s-loadbalancer.conf
+                cp /fluentd/etc2/efk-ufsm-proxy-tcp.conf /fluentd/etc/efk-ufsm-proxy-tcp.conf
+                cp /fluentd/etc2/efk-ufsm-proxy-reverso.conf /fluentd/etc/efk-ufsm-proxy-reverso.conf
+                for i in dev replica prod; do
+                    export ENV=$i
+                    echo "Configurando fluentd do sieweb do ambiente $ENV"
+                    envsubst < /fluentd/etc2/efk-ufsm-sieweb.conf > /fluentd/etc/efk-ufsm-$ENV-sieweb.conf
+                    envsubst < /fluentd/etc2/efk-ufsm-sieweb-timer.conf > /fluentd/etc/efk-ufsm-$ENV-sieweb-timer.conf
+                done
+          volumeMounts:
+            - name: config-path
+              mountPath: /fluentd/etc
+            - name: config-source
+              mountPath: /fluentd/etc2
+      containers:
+        - name: fluentd
+          image: evertonagilar/fluentd:1.0.1
+          securityContext:
+            #allowPrivilegeEscalation: true
+            runAsUser: 0
+          env:
+            - name: K8S_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+#            - name: K8S_NODE_NAME
+#              value: "es-cluster-0"
+            - name:  FLUENT_ELASTICSEARCH_HOST
+              value: "es-cluster-0.elasticsearch.efk-logging.svc.cluster.local"
+            - name:  FLUENT_ELASTICSEARCH_PORT
+              value: "9200"
+            - name: FLUENT_ELASTICSEARCH_SCHEME
+              value: "https"
+            - name: FLUENT_ELASTICSEARCH_SSL_VERIFY
+              value: "false"
+            - name: FLUENT_ELASTICSEARCH_SSL_VERSION
+              value: "TLSv1_3"
+            - name: FLUENT_ELASTICSEARCH_USER
+              value: "elastic"
+            - name: FLUENT_ELASTICSEARCH_PASSWORD
+              value: "J#DEkUUxFOHNPOEQkMU9uZ0@2025"
+#            - name: FLUENTD_SYSTEMD_CONF
+#              value: disable
+          resources:
+            limits:
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 200Mi
+          volumeMounts:
+            - name: varlog
+              mountPath: /var/log
+            - name: varlibdockercontainers
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+            - name: config-path
+              mountPath: /fluentd/etc
+      terminationGracePeriodSeconds: 7
+      volumes:
+        - name: varlog
+          hostPath:
+            path: /var/log
+        - name: varlibdockercontainers
+          hostPath:
+            path: /var/lib/docker/containers
+        - name: config-source
+          configMap:
+            name: fluentd-config
+        - name: config-path
+          emptyDir: {}

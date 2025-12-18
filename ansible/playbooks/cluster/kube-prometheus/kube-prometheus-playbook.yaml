@@ -1,0 +1,6 @@
+---
+- name: Provisionar stack kube-prometheus
+  hosts: controlplane_init
+  become: yes
+  roles:
+    - kube-prometheus

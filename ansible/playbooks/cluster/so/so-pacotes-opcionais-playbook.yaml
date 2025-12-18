@@ -1,0 +1,6 @@
+- name: Instalar pacotes opcionais
+  hosts: controlplane worker
+  become: yes
+  roles:
+    - pacotes-opcionais
+

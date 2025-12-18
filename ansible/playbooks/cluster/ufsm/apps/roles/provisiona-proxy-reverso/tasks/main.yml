@@ -1,0 +1,20 @@
+---
+- name: Variáveis utilizadas para provisionar proxy-reverso
+  debug:
+    msg:
+      - "ansible_host = {{ ansible_host }}"
+      - "ansible_hostname = {{ ansible_hostname }}"
+      - "REPO_PROXY_REVERSO.repo = {{ REPO_PROXY_REVERSO.repo }}"
+      - "REPO_PROXY_REVERSO.path = {{ REPO_PROXY_REVERSO.path }}"
+      - "REPO_PROXY_REVERSO.dest_server = {{ REPO_PROXY_REVERSO.dest_server }}"
+      - "REPO_PROXY_REVERSO.sync_policy = {{ REPO_PROXY_REVERSO.sync_policy }}"
+      - "REPO_PROXY_REVERSO.revision = {{ REPO_PROXY_REVERSO.revision }}"
+
+- name: Verificando se app/proxy-reverso já está provisionado no ArgoCD
+  shell: kubectl -n argocd get app/proxy-reverso --ignore-not-found
+  register: existe_app
+
+- name: Registrando proxy-reverso no ArgoCD
+  shell: argocd app create proxy-reverso --repo {{ REPO_PROXY_REVERSO.repo }} --path {{ REPO_PROXY_REVERSO.path }} --dest-server {{ REPO_PROXY_REVERSO.dest_server }} --dest-namespace proxy-reverso --sync-policy {{ REPO_PROXY_REVERSO.sync_policy }} --revision {{ REPO_PROXY_REVERSO.revision }}
+  when: existe_app.stdout == ""
+

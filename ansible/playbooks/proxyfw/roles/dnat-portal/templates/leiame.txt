@@ -1,0 +1,7 @@
+ cpd-dnat-portal.sh é um script que hablita o DNAT para o novo proxy reverso.
+ 
+ O script é carregado pelo serviço cpd-dnat-portal.service 
+  
+
+
+ 

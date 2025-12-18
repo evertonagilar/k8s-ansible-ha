@@ -1,0 +1,41 @@
+---
+- name: Provisionar ingress nginx no Kubernetes
+  hosts: controlplane_init
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - ingress-nginx
+  tags:
+    - ingress-nginx
+    - ingress
+
+- name: Provisionar metrics-server no Kubernetes
+  hosts: controlplane_init
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - metrics-server
+  tags:
+    - metrics-server
+
+- name: Instalar o csi-driver-nfs no Kubernetes
+  hosts: controlplane_init
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - k8s-csi-driver-nfs
+  tags:
+    - csi-driver-nfs
+
+- name: Provisionar storage class
+  hosts: controlplane_init
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - k8s-storage-class
+  tags:
+    - storage-class

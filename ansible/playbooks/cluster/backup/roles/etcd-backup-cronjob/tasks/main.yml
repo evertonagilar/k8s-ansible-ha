@@ -1,0 +1,19 @@
+---
+- name: Variáveis utilizadas para provisionar etcd-backup-cronjob
+  debug:
+    msg:
+      - "ansible_host = {{ ansible_host }}"
+      - "ansible_hostname = {{ ansible_hostname }}"
+
+- name: Criar namespace backup-jobs
+  kubernetes.core.k8s:
+    name: backup-jobs
+    api_version: v1
+    kind: Namespace
+    state: present
+
+- name: Provisionar job etcd-backup-cronjob
+  kubernetes.core.k8s:
+    template: etcd-backup-cronjob.yaml
+    state: present
+    force: yes   # Ansible doc: If set to yes, and state is present, an existing object will be replaced.

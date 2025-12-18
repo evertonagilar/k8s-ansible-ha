@@ -1,0 +1,7 @@
+---
+- name: Provisionar jobs de backup etcd, logs e outros
+  hosts: controlplane_init
+  become: yes
+  roles:
+    - etcd-backup-cronjob
+    - backup-logs

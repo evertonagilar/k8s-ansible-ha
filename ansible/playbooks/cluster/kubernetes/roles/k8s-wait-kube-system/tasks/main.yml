@@ -1,0 +1,7 @@
+---
+- name: Aguardar kube-system ficar pronto
+  shell: kubectl --kubeconfig=/etc/kubernetes/admin.conf wait --timeout=-1s --for=condition=Ready pod --all -n kube-system
+  args:
+    executable: /bin/bash
+  ignore_errors: true
+

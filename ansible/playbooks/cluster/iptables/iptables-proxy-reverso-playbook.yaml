@@ -1,0 +1,5 @@
+- name: Provisionar firewall nos proxy reverso
+  hosts: proxy
+  become: yes
+  roles:
+    - iptables-firewall

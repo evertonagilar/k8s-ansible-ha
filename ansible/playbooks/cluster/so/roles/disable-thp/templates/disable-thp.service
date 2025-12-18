@@ -1,0 +1,9 @@
+[Unit]
+Description=Desativa Transparent Huge Pages (Recomendado para alguns serviços como banco de dados)
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'echo never > /sys/kernel/mm/transparent_hugepage/enabled; echo never > /sys/kernel/mm/transparent_hugepage/defrag'
+
+[Install]
+WantedBy=multi-user.target

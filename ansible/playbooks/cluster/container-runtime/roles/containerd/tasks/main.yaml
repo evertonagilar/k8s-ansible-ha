@@ -1,0 +1,75 @@
+---
+- name: Variáveis utilizadas para instalar o containerd
+  debug:
+    msg:
+      - "ansible_host = {{ ansible_host }}"
+      - "ansible_hostname = {{ ansible_hostname }}"
+      - "ansible_distribution = {{ ansible_distribution }}"
+      - "ansible_distribution_release = {{ ansible_distribution_release }}"
+      - "VM_CONTAINER_VERSION = {{ VM_CONTAINER_VERSION }}"
+
+- name: Instalação dos módulos do Kernel
+  copy:
+    src: containerd.conf
+    dest: /etc/modules-load.d/containerd.conf
+    mode: 0644
+
+- name: Carregar módulo overlay
+  modprobe:
+    name: overlay
+    state: present
+
+- name: Carregar módulo br_netfilter
+  modprobe:
+    name: br_netfilter
+    state: present
+
+- name: Adicionar a chave do repositório APT do containerd
+  apt_key:
+    url: https://download.docker.com/linux/debian/gpg
+    keyring: /etc/apt/keyrings/docker.gpg
+    state: present
+
+- name: Adicionar o repositório APT do containerd
+  apt_repository:
+    repo: "{{ apt_repo_url }}"
+    filename: docker
+    update_cache: yes
+  vars:
+    apt_repo_url: >-
+      {% if ansible_distribution == 'Debian' %}
+      deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable
+      {% elif ansible_distribution == 'Ubuntu' %}
+      deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+      {% endif %}
+
+- name: Instalar o containerd.io
+  apt:
+    name: "containerd.io={{ VM_CONTAINER_VERSION }}"
+    state: present
+
+- name: Criar diretório de configuração do containerd
+  file:
+    path: /etc/containerd
+    state: directory
+    mode: 0644
+
+- name: Criar arquivo de configuração do containerd
+  template:
+    src: config.toml
+    dest: /etc/containerd/config.toml
+    mode: 0644
+  register: containerd_config
+
+- name: Reiniciar o Containerd para aplicar configuração
+  service:
+    name: containerd
+    state: restarted
+  when: containerd_config.changed
+
+- name: Criar arquivo de configuração /etc/crictl.yaml
+  copy:
+    src: crictl.yaml
+    dest: /etc/crictl.yaml
+    mode: 0644
+

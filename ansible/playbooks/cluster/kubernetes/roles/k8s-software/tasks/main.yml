@@ -1,0 +1,11 @@
+---
+- name: Instalar módulos do Kernel
+  include_tasks: kernel-modules.yml
+  tags:
+    - kernel-modules
+
+- name: Instalar o software do Kubernetes
+  include_tasks: k8s-software.yml
+  tags:
+    - k8s-software
+

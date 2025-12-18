@@ -1,0 +1,6 @@
+---
+- name: Provisionar manifestos user management
+  hosts: controlplane_init
+  become: yes
+  roles:
+    - user-management

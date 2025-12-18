@@ -1,0 +1,28 @@
+---
+- name: Variáveis utilizadas para join novo worker {{ ansible_host }}
+  debug:
+    msg:
+      - "ansible_host = {{ ansible_host }}"
+      - "ansible_hostname = {{ ansible_hostname }}"
+      - "VM_CONTROL_PLANE_ENDPOINT = {{ VM_CONTROL_PLANE_ENDPOINT }}"
+      - "VM_POD_NETWORK_CIDR = {{ VM_POD_NETWORK_CIDR }}"
+      - "VM_SERVICE_CIDR = {{ VM_SERVICE_CIDR }}"
+      - "VM_VIRTUAL_IP = {{ VM_VIRTUAL_IP }}"
+      - "join_command = {{ hostvars[groups['controlplane_init'][0]].join_command }}"
+      - "join_token = {{ hostvars[groups['controlplane_init'][0]].join_token }}"
+
+- name: Verificando se o worker já está provisionado
+  stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: cluster_stat
+
+- name: Adicionar o node worker
+  shell: |
+    {{ hostvars[groups['controlplane_init'][0]].join_command }} \
+    --apiserver-advertise-address={{ ansible_host }} \
+    --node-name {{ ansible_hostname }} \
+    --cri-socket unix:///run/containerd/containerd.sock
+  args:
+    executable: /bin/bash
+  when: not cluster_stat.stat.exists
+

@@ -1,0 +1,26 @@
+---
+- name: Variáveis utilizadas para configurar o Kubelet
+  debug:
+    msg:
+    - "ansible_host = {{ ansible_host }}"
+    - "ansible_hostname = {{ ansible_hostname }}"
+    - "KUBELET.container_log_max_size = {{ KUBELET.container_log_max_size }}"
+    - "KUBELET.container_log_max_files = {{ KUBELET.container_log_max_files }}"
+    - "KUBELET.minimum_container_ttl_duration = {{ KUBELET.minimum_container_ttl_duration }}"
+    - "KUBELET.maximum_dead_containers_per_container = {{ KUBELET.maximum_dead_containers_per_container }}"
+    - "KUBELET.backup_log_path = {{ KUBELET.backup_log_path }}"
+
+- name: Remover KUBELET_EXTRA_ARGS do /etc/default/kubelet (se existir)
+  lineinfile:
+    path: "/etc/default/kubelet"
+    regexp: '^KUBELET_EXTRA_ARGS='
+    state: absent
+
+- name: Adicionar KUBELET_EXTRA_ARGS no /etc/default/kubelet
+  lineinfile:
+    path: "/etc/default/kubelet"
+    line: "KUBELET_EXTRA_ARGS=--node-ip={{ ansible_host }} --container-runtime-endpoint=unix:///run/containerd/containerd.sock --container-log-max-size={{ KUBELET.container_log_max_size }} --container-log-max-files={{ KUBELET.container_log_max_files }} --minimum-container-ttl-duration={{ KUBELET.minimum_container_ttl_duration }} --maximum-dead-containers-per-container={{ KUBELET.maximum_dead_containers_per_container }}"
+    create: true
+    state: present
+  notify: Reiniciar kubelet
+

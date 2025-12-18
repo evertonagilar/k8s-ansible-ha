@@ -1,0 +1,13 @@
+---
+- name: Variáveis utilizadas para fazer login com argocd CLI
+  debug:
+    msg:
+      - "ansible_host = {{ ansible_host }}"
+      - "ansible_hostname = {{ ansible_hostname }}"
+      - "VM_AMBIENTE = {{ VM_AMBIENTE }}"
+      - "ARGOCD.ingress.host = {{ ARGOCD.ingress.host }}"
+      - "ARGOCD.username = {{ ARGOCD.username }}"
+      - "ARGOCD.password = {{ ARGOCD.password }}"
+
+- name: Login no argocd CLI
+  shell: argocd login --grpc-web {{ '--insecure' if VM_AMBIENTE == "local" }}  {{ ARGOCD.ingress.host }} --username {{ ARGOCD.username }} --password {{ ARGOCD.password

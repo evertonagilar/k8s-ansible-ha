@@ -1,0 +1,38 @@
+---
+- name: Unhold kubeadm
+  ansible.builtin.dpkg_selections:
+    name: kubeadm
+    selection: install
+
+- name: Unhold kubelet
+  ansible.builtin.dpkg_selections:
+    name: kubelet
+    selection: install
+
+- name: Unhold kubectl
+  ansible.builtin.dpkg_selections:
+    name: kubectl
+    selection: install
+
+- name: Atualizar kubeadm, kubectl e kubelet
+  ansible.builtin.apt:
+    pkg:
+      - "kubectl={{ VM_K8S_VERSION }}"
+      - "kubeadm={{ VM_K8S_VERSION }}"
+      - "kubelet={{ VM_K8S_VERSION }}"
+    state: present
+
+- name: Hold kubeadm
+  ansible.builtin.dpkg_selections:
+    name: kubeadm
+    selection: hold
+
+- name: Hold kubelet
+  ansible.builtin.dpkg_selections:
+    name: kubelet
+    selection: hold
+
+- name: Hold kubectl
+  ansible.builtin.dpkg_selections:
+    name: kubectl
+    selection: hold

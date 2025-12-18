@@ -1,0 +1,7 @@
+---
+- name: Drenar o node antes de atualizar
+  kubernetes.core.k8s_drain:
+    state: drain
+    name: {{ ansible_hostname }}
+    delete_options:
+      terminate_grace_period: 100

@@ -1,0 +1,6 @@
+- name: Instalar pacotes essenciais
+  hosts: controlplane worker
+  become: yes
+  roles:
+    - pacotes-essenciais
+

@@ -1,0 +1,14 @@
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: pool-local
+  namespace: metallb-system
+spec:
+  addresses:
+    - 192.168.20.240-192.168.20.250  # faixa dentro da sua rede VBox
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: advert
+  namespace: metallb-system

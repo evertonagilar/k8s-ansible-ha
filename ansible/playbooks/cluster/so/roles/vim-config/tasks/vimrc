@@ -1,0 +1,7 @@
+set nomodeline
+set bg=dark
+set tabstop=2
+set expandtab
+set ruler
+set nu
+syntax on

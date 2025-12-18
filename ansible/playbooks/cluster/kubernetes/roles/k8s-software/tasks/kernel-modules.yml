@@ -1,0 +1,46 @@
+---
+- name: Instalar /etc/modules-load.d/k8s.conf
+  copy:
+    src: templates/k8s.conf
+    dest: /etc/modules-load.d/k8s.conf
+    mode: 644
+
+- name: Carregar módulo overlay
+  modprobe:
+    name: overlay
+    state: present
+
+- name: Carregar módulo br_netfilter
+  modprobe:
+    name: br_netfilter
+    state: present
+
+- name: Carregar módulo nf_nat
+  modprobe:
+    name: nf_nat
+    state: present
+
+- name: Carregar módulo xt_owner
+  modprobe:
+    name: xt_owner
+    state: present
+
+- name: Carregar módulo xt_REDIRECT
+  modprobe:
+    name: xt_REDIRECT
+    state: present
+
+- name: Carregar módulo iptable_nat
+  modprobe:
+    name: iptable_nat
+    state: present
+
+- name: Carregar módulo iptable_mangle
+  modprobe:
+    name: iptable_mangle
+    state: present
+
+- name: Carregar módulo iptable_filter
+  modprobe:
+    name: iptable_filter
+    state: present

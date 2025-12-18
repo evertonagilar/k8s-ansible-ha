@@ -1,0 +1,7 @@
+---
+- name: Configurar DNS em /etc/hosts
+  lineinfile:
+    dest: /etc/hosts
+    state: present
+    line: "{{item}}"
+  loop: "{{ hosts_entries }}"

@@ -1,0 +1,17 @@
+---
+- name: Variáveis utilizadas para provisionar metallb
+  debug:
+    msg:
+      - "METALLB.url = {{ METALLB.url }}"
+
+- name: Instalar MetalLB
+  kubernetes.core.k8s:
+    namespace: metallb-system
+    src: "{{ METALLB.url }}"
+    state: present
+    wait: yes
+
+- name: Configurar a pools de IPs do MetalLB
+  kubernetes.core.k8s:
+    template: metallb-config.yaml
+    state: present

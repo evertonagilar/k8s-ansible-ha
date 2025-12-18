@@ -1,0 +1,154 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+VM_BOX = "boxomatic/debian-12"
+VM_BOX_VERSION = "20240225.0.1"
+VM_CLUSTER_GROUP = "/VagrantMultiNode"
+VM_CONTROLPLANE_COUNT = 3
+VM_WORKER_COUNT = 3
+VM_WORKER_MEMORY = [ 14048, 8048, 2048, 2048 ]
+VM_COUNT = VM_CONTROLPLANE_COUNT + VM_WORKER_COUNT
+VM_IP_SUFIX = "192.168.20"
+VM_IP_CONTROLPLANE_START = 10
+VM_IP_WORKER_START = 15
+VM_IP_ROTA_DEFAULT = "#{VM_IP_SUFIX}.8"
+VM_MASTER_BASE_NAME = "vm-controlplane-0"
+VM_WORKER_BASE_NAME = "vm-worker-0"
+VM_VIRTUAL_IP = "#{VM_IP_SUFIX}.#{VM_IP_CONTROLPLANE_START}"
+VM_VRRP_PASSWD = 123456
+VM_CLUSTER_DOMAIN = "kubernetes.local"
+VM_CLUSTER_NAME = "k8s"
+VM_CONTROL_PLANE_ENDPOINT = "{{ VM_CLUSTER_NAME }}.{{ VM_CLUSTER_DOMAIN }}:6443"
+VM_K8S_VERSION = "1.34.1-1.1"
+VM_K8S_REPO = "v1.34"
+VM_CONTAINERD_VERSION = "1.7.27-1"
+VM_CALICO_VERSION = "v3.27.1"
+VM_POD_NETWORK_CIDR = "10.244.0.0/16"
+VM_SERVICE_CIDR = "10.96.0.0/12"
+VM_BOOTSTRAP_WITH_ANSIBLE="true"
+
+# Gerar chaves SSH se não existirem
+SSH_KEY_PATH = "../common/ssh/k8s-multinode"
+if !File.exist?(SSH_KEY_PATH)
+  puts "Chaves SSH não encontradas via cluster/Vagrantfile. Gerando novas chaves em #{SSH_KEY_PATH}..."
+  # Garantir que o diretório existe
+  File.dirname(SSH_KEY_PATH).tap { |dir| Dir.mkdir(dir) unless Dir.exist?(dir) }
+  # Gerar a chave sem senha (-N "") e sobrescrever se necessário (-f)
+  system("ssh-keygen -t rsa -b 4096 -f #{SSH_KEY_PATH} -N '' -C 'k8s-multinode'")
+  # Garantir permissões corretas
+  File.chmod(0600, SSH_KEY_PATH)
+  File.chmod(0644, "#{SSH_KEY_PATH}.pub")
+end
+
+Vagrant.configure(2) do |config|
+  config.vm.box = "#{VM_BOX}"
+  config.vm.box_version = "#{VM_BOX_VERSION}"
+  config.vm.box_check_update = false
+  #config.vbguest.auto_update = false
+
+  # Criar os control-planes do cluster
+  (1..VM_CONTROLPLANE_COUNT).each do |i|
+    hostname = "#{VM_MASTER_BASE_NAME}#{i}"
+    ip = "#{VM_IP_SUFIX}.#{VM_IP_CONTROLPLANE_START + i}"
+
+    vrrpPrioridade = 101 - i
+    vrrpType = i == 1 ? "MASTER" : "BACKUP"
+    config.vm.define hostname do |node|
+      node.vm.provider "virtualbox" do |v|
+        v.name = hostname
+        v.memory = 2048
+        v.cpus = 2
+        v.customize ["modifyvm", :id, "--groups", VM_CLUSTER_GROUP]
+      end
+      node.vm.disk :disk, size: "100GB", primary: true
+      node.vm.hostname = hostname
+      node.vm.network "private_network", ip: ip, hostname: true
+      node.vm.provision "file", source: "../common", destination: "~/common"
+      node.vm.provision "file", source: "scripts", destination: "~/scripts"
+      node.vm.provision "file", source: "config", destination: "~/config"
+      node.vm.provision "shell",
+        env: {
+              "VM_CONTROLPLANE_COUNT" => VM_CONTROLPLANE_COUNT,
+              "VM_WORKER_COUNT" => VM_WORKER_COUNT,
+              "VM_CONTROLPLANE_NUMBER" => i,
+              "VM_CLUSTER_DOMAIN" => VM_CLUSTER_DOMAIN,
+              "VM_CLUSTER_NAME" => VM_CLUSTER_NAME,
+              "VM_CONTROL_PLANE_ENDPOINT" => VM_CONTROL_PLANE_ENDPOINT,
+              "VM_POD_NETWORK_CIDR" => VM_POD_NETWORK_CIDR,
+              "VM_SERVICE_CIDR" => VM_SERVICE_CIDR,
+              "VM_COUNT" => VM_COUNT,
+              "VM_TYPE" => "controlplane",
+              "VM_IP_CONTROLPLANE_START" => VM_IP_CONTROLPLANE_START,
+              "VM_IP_WORKER_START" => VM_IP_WORKER_START,
+              "VM_IP_SUFIX" => VM_IP_SUFIX,
+              "VM_MASTER_BASE_NAME" => VM_MASTER_BASE_NAME,
+              "VM_WORKER_BASE_NAME" => VM_WORKER_BASE_NAME,
+              "VM_HOSTNAME" => hostname,
+              "VM_IP" => ip,
+              "VM_VIRTUAL_IP" => VM_VIRTUAL_IP,
+              "VM_VRRP_PRIORIDADE" => vrrpPrioridade,
+              "VM_VRRP_TYPE" => vrrpType,
+              "VM_VRRP_PASSWD" => VM_VRRP_PASSWD,
+              "VM_K8S_VERSION" => VM_K8S_VERSION,
+              "VM_K8S_REPO" => VM_K8S_REPO,
+              "VM_CONTAINERD_VERSION" => VM_CONTAINERD_VERSION,
+              "VM_CALICO_VERSION" => VM_CALICO_VERSION,
+              "ETCDCTL_API" => "3",
+              "VM_BOOTSTRAP_WITH_ANSIBLE" => VM_BOOTSTRAP_WITH_ANSIBLE
+            }, path: "scripts/bootstrap.sh"
+    end
+  end
+
+  # Criar os workers do cluster
+  (1..VM_WORKER_COUNT).each do |i|
+    hostname = "#{VM_WORKER_BASE_NAME}#{i}"
+    ip = "#{VM_IP_SUFIX}.#{VM_IP_WORKER_START + i}"
+    config.vm.define hostname do |node|
+      node.vm.provider "virtualbox" do |v|
+        v.name = hostname
+        v.memory = VM_WORKER_MEMORY[i-1]
+        v.cpus = 2
+        v.customize ["modifyvm", :id, "--groups", VM_CLUSTER_GROUP]
+      end
+      node.vm.disk :disk, size: "100GB", primary: true
+      node.vm.hostname = hostname
+      node.vm.network "private_network", ip: ip, hostname: true
+      node.vm.provision "file", source: "../common", destination: "~/common"
+      node.vm.provision "file", source: "scripts", destination: "~/scripts"
+      node.vm.provision "file", source: "config", destination: "~/config"
+      node.vm.provision "shell",
+        env: {
+              "VM_CONTROLPLANE_COUNT" => VM_CONTROLPLANE_COUNT,
+              "VM_WORKER_COUNT" => VM_WORKER_COUNT,
+              "VM_WORKER_NUMBER" => i,
+              "VM_CLUSTER_DOMAIN" => VM_CLUSTER_DOMAIN,
+              "VM_CLUSTER_NAME" => VM_CLUSTER_NAME,
+              "VM_CONTROL_PLANE_ENDPOINT" => VM_CONTROL_PLANE_ENDPOINT,
+              "VM_COUNT" => VM_COUNT,
+              "VM_TYPE" => "worker",
+              "VM_IP_CONTROLPLANE_START" => VM_IP_CONTROLPLANE_START,
+              "VM_IP_WORKER_START" => VM_IP_WORKER_START,
+              "VM_IP_SUFIX" => VM_IP_SUFIX,
+              "VM_MASTER_BASE_NAME" => VM_MASTER_BASE_NAME,
+              "VM_WORKER_BASE_NAME" => VM_WORKER_BASE_NAME,
+              "VM_HOSTNAME" => hostname,
+              "VM_IP" => ip,
+              "VM_VIRTUAL_IP" => VM_VIRTUAL_IP,
+              "VM_K8S_VERSION" => VM_K8S_VERSION,
+              "VM_K8S_REPO" => VM_K8S_REPO,
+              "VM_CALICO_VERSION" => VM_CALICO_VERSION,
+              "VM_BOOTSTRAP_WITH_ANSIBLE" => VM_BOOTSTRAP_WITH_ANSIBLE
+            }, path: "scripts/bootstrap.sh"
+    end
+  end
+
+  # Adiciona a rota default substituindo a criada pelo vagrant
+  config.vm.provision "shell",
+    run: "always",
+    inline: <<-SHELL
+        echo "Adicionando rota default: #{VM_IP_ROTA_DEFAULT}"
+        sudo ip route del default 2> /dev/null
+        sudo ip route add default via #{VM_IP_ROTA_DEFAULT}
+  SHELL
+
+end

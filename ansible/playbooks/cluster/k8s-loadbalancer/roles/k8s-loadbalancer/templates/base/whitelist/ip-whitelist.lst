@@ -1,0 +1,6 @@
+200.18.32.0/24
+200.18.33.0/24
+{% for host in groups['controlplane'] %}
+{{ hostvars[host].ansible_host }}/32
+{% endfor %}
+

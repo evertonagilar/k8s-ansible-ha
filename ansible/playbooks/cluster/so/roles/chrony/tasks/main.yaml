@@ -1,0 +1,22 @@
+---
+- name: Instalar o servidor NTP Chrony
+  apt:
+    name: chrony
+    state: present
+
+- name: Remove todas entradas pool*
+  lineinfile:
+    path: /etc/chrony/chrony.conf
+    state: absent
+    regexp: '^pool\s+.*'
+
+- name: Adiciona pool do ntp.br
+  lineinfile:
+    path: /etc/chrony/chrony.conf
+    line: 'pool a.st1.ntp.br iburst maxsources 4'
+    insertafter: EOF
+
+- name: Reinicia o serviço chrony
+  service:
+    name: chrony
+    state: restarted

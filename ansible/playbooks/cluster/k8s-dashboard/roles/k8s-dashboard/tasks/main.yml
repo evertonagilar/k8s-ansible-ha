@@ -1,0 +1,58 @@
+---
+- name: Variáveis utilizadas para provisionar k8s-dashboard
+  debug:
+    msg:
+      - "K8S_DASHBOARD.url = {{ K8S_DASHBOARD.url }}"
+      - "K8S_DASHBOARD.ingress.host = {{ K8S_DASHBOARD.ingress.host }}"
+      - "K8S_DASHBOARD.ingress.clusterIssuer = {{ K8S_DASHBOARD.ingress.clusterIssuer }}"
+      - "K8S_DASHBOARD.ingress.secretName = {{ K8S_DASHBOARD.ingress.secretName }}"
+      - "K8S_DASHBOARD.ingress.whitelist = {{ K8S_DASHBOARD.ingress.whitelist }}"
+      - "K8S_DASHBOARD.ingress.limitConnections = {{ K8S_DASHBOARD.ingress.limitConnections }}"
+
+- name: Verificar se o namespace kubernetes-dashboard já existe
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Namespace
+    name: kubernetes-dashboard
+  register: k8s_dashboard_info
+  ignore_errors: yes
+
+- name: Criar namespace kubernetes-dashboard
+  kubernetes.core.k8s:
+    name: kubernetes-dashboard
+    api_version: v1
+    kind: Namespace
+    state: present
+  register: k8s_dashboard
+  when: k8s_dashboard_info.resources | length == 0
+
+- name: Instalar Dashboard Kubernetes
+  kubernetes.core.k8s:
+    namespace: kubernetes-dashboard
+    src: "{{ K8S_DASHBOARD.url }}"
+    state: present
+    wait: yes
+  when: k8s_dashboard.changed
+  register: k8s_dashboard_setup
+
+- name: Provisionar ServiceAccount admin-user
+  kubernetes.core.k8s:
+    template: admin-user-sa.yaml
+    state: present
+    wait: yes
+
+- name: Provisionar ClusterRoleBinding admin-user
+  kubernetes.core.k8s:
+    template: admin-user-clusterrolebinding.yaml
+    state: present
+    wait: yes
+
+- name: Provisionar k8s-dashboard-ingress
+  kubernetes.core.k8s:
+    template: k8s-dashboard-ingress.yaml
+    state: present
+
+- name: Provisionar k8s-dashboard-netpool
+  kubernetes.core.k8s:
+    template: k8s-dashboard-netpol.yaml
+    state: present

@@ -1,0 +1,10 @@
+---
+- name: Desabilitar o swap em /etc/fstab
+  replace:
+    path: /etc/fstab
+    regexp: '^(\s*)([^#\n]+\s+)(\w+\s+)swap(\s+.*)$'
+    replace: '#\1\2\3swap\4'
+    backup: yes
+
+- name: Desabilitar o swap na sessão atual
+  command: swapoff -a

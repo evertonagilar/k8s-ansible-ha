@@ -1,0 +1,24 @@
+---
+- name: Verificar se o namespace kube-prometheus já existe
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Namespace
+    name: kube-prometheus
+  register: kube_prometheus_info
+  ignore_errors: yes
+
+- name: Criar namespace kube_prometheus_info
+  kubernetes.core.k8s:
+    name: kube-prometheus
+    api_version: v1
+    kind: Namespace
+    state: present
+  register: kube_prometheus
+  when: kube_prometheus_info.resources | length == 0
+
+
+#- name: Provisionar k8s-dashboard-ingress
+#  kubernetes.core.k8s:
+#    template: kube-prometheus-ingress.yaml
+#    state: present
+

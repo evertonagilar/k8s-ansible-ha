@@ -1,0 +1,20 @@
+---
+- name: Variáveis utilizadas para provisionar {{ NOME_PORTAL }}
+  debug:
+    msg:
+      - "ansible_host = {{ ansible_host }}"
+      - "ansible_hostname = {{ ansible_hostname }}"
+      - "NAMESPACE_SIEWEB = {{ NAMESPACE_SIEWEB }}"
+      - "NOME_PORTAL = {{ NOME_PORTAL }}"
+      - "ENV_PREFIX = {{ ENV_PREFIX }}"
+      - "OVERLAY_PATH = {{ OVERLAY_PATH }}"
+
+- name: Verificando se app/{{ ENV_PREFIX }}portal já está provisionado no ArgoCD
+  shell: kubectl -n argocd get app/{{ ENV_PREFIX }}portal --ignore-not-found
+  register: existe_app
+
+- name: Registrando {{ NOME_PORTAL }} no ArgoCD
+  shell: argocd app create {{ NOME_PORTAL }} --repo {{ item.repo }} --path {{ OVERLAY_PATH }} --dest-server {{ item.dest_server }} --dest-namespace {{ NAMESPACE_SIEWEB }} --sync-policy {{ item.sync_policy }} --revision {{ item.revision }}
+  with_items: "{{ REPO_PORTAL }}"
+  when: existe_app.stdout == ""
+

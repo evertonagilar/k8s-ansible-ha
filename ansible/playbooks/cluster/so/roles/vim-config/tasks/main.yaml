@@ -1,0 +1,46 @@
+---
+- name: Stat da pasta /home/vagrant
+  stat:
+    path: /home/vagrant
+  register: dir_vagrant_stat
+
+- name: Configurar o vim no usuário vagrant
+  copy:
+    src: vimrc
+    dest: /home/vagrant/.vimrc
+    mode: 0644
+    owner: vagrant
+  when: dir_vagrant_stat.stat.exists
+
+- name: Configurar o vim no usuário root
+  copy:
+    src: vimrc
+    dest: /root/.vimrc
+    mode: 0644
+    owner: root
+
+- name: Stat da pasta /home/ubuntu
+  stat:
+    path: /home/ubuntu
+  register: dir_ubuntu_stat
+
+- name: Configurar o vim no usuário ubuntu
+  copy:
+    src: vimrc
+    dest: /home/ubuntu/.vimrc
+    mode: 0644
+    owner: ubuntu
+  when: dir_ubuntu_stat.stat.exists
+
+- name: Stat da pasta /home/interno
+  stat:
+    path: /home/interno
+  register: dir_interno_stat
+
+- name: Configurar o vim no usuário interno
+  copy:
+    src: vimrc
+    dest: /home/interno/.vimrc
+    mode: 0644
+    owner: interno
+  when: dir_interno_stat.stat.exists

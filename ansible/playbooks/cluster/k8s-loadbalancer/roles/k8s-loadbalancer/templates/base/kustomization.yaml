@@ -1,0 +1,18 @@
+namespace: k8s-loadbalancer
+
+resources:
+  - k8s-loadbalancer-namespace.yaml
+  - k8s-loadbalancer-daemonset.yaml
+
+configMapGenerator:
+  - name: haproxy-config
+    files:
+      - haproxy.cfg
+
+  - name: whitelist
+    files:
+      - whitelist/ip-whitelist.lst
+
+generatorOptions:
+  disableNameSuffixHash: true
+

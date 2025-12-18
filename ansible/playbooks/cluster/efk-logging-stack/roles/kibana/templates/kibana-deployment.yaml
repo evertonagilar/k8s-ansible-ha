@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kibana
+  namespace: efk-logging
+  labels:
+    app: kibana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kibana
+  template:
+    metadata:
+      labels:
+        app: kibana
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: "{{ EFK_LOGGING.kibana.nodeName }}"
+      tolerations:
+        - key: "node-role.kubernetes.io/control-plane"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
+      containers:
+        - name: kibana
+          image: kibana:8.16.0
+          resources:
+            limits:
+              cpu: 3000m
+            requests:
+              cpu: 100m
+#          env:
+#            - name: ELASTICSEARCH_HOSTS
+#              value: "https://es-cluster-0.elasticsearch.efk-logging.svc.cluster.local:9200"
+#            - name: ELASTICSEARCH_HOST
+#              value: "0.0.0.0"
+#            - name: ELASTICSEARCH_PORT
+#              value: "5601"
+#            - name: ELASTICSEARCH_USERNAME
+#              value: "elastic"
+#            - name: ELASTICSEARCH_PASSWORD
+#              value: "J#DEkUUxFOHNPOEQkMU9uZ0@2025"
+#            - name: SERVER_PUBLICBASEURL
+#              value: "https://kibana.k8s.si.ufsm.br"
+          ports:
+            - containerPort: 5601
+          volumeMounts:
+            - name: kibana-data
+              mountPath: /usr/share/kibana/data
+            - name: kibana-config
+              mountPath: /usr/share/kibana/config/kibana.yml
+              subPath: kibana.yml
+              readOnly: true
+      volumes:
+        - name: kibana-data
+          persistentVolumeClaim:
+            claimName: kibana-data-pvc
+        - name: kibana-config
+          configMap:
+            name: kibana-config

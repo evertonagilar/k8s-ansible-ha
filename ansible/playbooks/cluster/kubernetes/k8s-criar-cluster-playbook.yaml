@@ -1,0 +1,32 @@
+---
+- name: Inicializar o cluster no primeiro controlplane
+  hosts: controlplane_init
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - k8s-baixar-imagens
+    - k8s-init
+  tags:
+    - cluster-init
+
+- name: Configurar kubeconfig
+  hosts: controlplane_init
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - k8s-kubeconfig
+  tags:
+    - kubeconfig
+
+- name: Instalar plugin de rede
+  hosts: controlplane_init
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - k8s-plugin-rede
+    - k8s-wait-kube-system
+  tags:
+    - plugin-rede

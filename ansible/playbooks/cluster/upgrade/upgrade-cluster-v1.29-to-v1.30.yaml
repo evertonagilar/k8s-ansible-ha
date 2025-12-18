@@ -1,0 +1,25 @@
+- name: Atualizar o primeiro controlplane
+  hosts: vm-controlplane1
+  user: vagrant
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - k8s-upgrade/upgrade-v1.29-to-v1.30/drain-node
+    - k8s-upgrade/upgrade-v1.29-to-v1.30/update-repository
+    - k8s-upgrade/upgrade-v1.29-to-v1.30/update-k8s-software
+    - k8s-upgrade/upgrade-v1.29-to-v1.30/upgrade-apply
+
+
+- name: Atualizar os demais controlplane
+  hosts: controlplane_join
+  user: vagrant
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - k8s-upgrade/upgrade-v1.29-to-v1.30/drain-node
+    - k8s-upgrade/upgrade-v1.29-to-v1.30/update-repository
+    - k8s-upgrade/upgrade-v1.29-to-v1.30/update-k8s-software
+    - k8s-upgrade/upgrade-v1.29-to-v1.30/upgrade-apply
+

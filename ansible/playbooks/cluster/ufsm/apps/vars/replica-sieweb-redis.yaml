@@ -1,0 +1,3 @@
+NAMESPACE: replica-sieweb-redis
+NOME_APP: replica-sieweb-redis
+OVERLAY_PATH: overlays/replica

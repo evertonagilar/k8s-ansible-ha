@@ -1,0 +1,9 @@
+---
+- name: Configurar o kubelet
+  hosts: controlplane worker
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - kubelet
+  

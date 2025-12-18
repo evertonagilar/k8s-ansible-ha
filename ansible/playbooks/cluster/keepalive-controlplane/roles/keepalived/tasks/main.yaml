@@ -1,0 +1,59 @@
+---
+- name: Define a prioridade da instância
+  set_fact: VM_VRRP_PRIORIDADE="{{ VM_VRRP_PRIORIDADE | default(100) - play_hosts.index(inventory_hostname) }}"
+
+- name: Define tipo da instância master ou backup
+  set_fact:
+    VM_VRRP_TYPE: >-
+      {% if play_hosts.index(inventory_hostname) == 0 %}
+      master
+      {% else %}
+      backup
+      {% endif %}
+
+# Tem que vir depois dos set_fact para não ocorrer variável undefined!!!
+- name: Variáveis utilizadas para instalar keepalived
+  debug:
+    msg:
+      - "ansible_host = {{ ansible_host }}"
+      - "ansible_hostname = {{ ansible_hostname }}"
+      - "play_hosts.index = {{ play_hosts.index(inventory_hostname) }}"
+      - "VM_VIRTUAL_IP = {{ VM_VIRTUAL_IP }}"
+      - "VM_VRRP_PRIORIDADE = {{ VM_VRRP_PRIORIDADE }}"
+      - "VM_VRRP_TYPE = {{ VM_VRRP_TYPE }}"
+
+- name: Instalar o keepalived
+  apt:
+    name: keepalived
+    state: present
+
+- name: Criar usuário keepalived_script
+  ansible.builtin.user:
+    name: keepalived_script
+    group: nogroup
+    system: yes
+    create_home: no
+    comment: "Usuário para executar script /etc/keepalived/check_apiserver.sh"
+
+- name: Instalar o arquivo de configuração /etc/keepalived/check_apiserver.sh
+  ansible.builtin.template:
+    src: check_apiserver.sh
+    dest: /etc/keepalived/check_apiserver.sh
+    owner: keepalived_script
+    group: nogroup
+    mode: '0544'
+
+- name: Criar o arquivo de configuração do keepalived
+  ansible.builtin.template:
+    src: keepalived.conf
+    dest: /etc/keepalived/keepalived.conf
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Habilitar o serviço keepalived
+  systemd:
+    name: keepalived
+    enabled: yes
+    state: started
+

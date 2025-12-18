@@ -1,0 +1,11 @@
+---
+- name: Provisionar ingress nginx no Kubernetes
+  hosts: controlplane_init
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - ingress-nginx
+  tags:
+    - ingress-nginx
+    - ingress

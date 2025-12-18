@@ -1,0 +1,160 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: k8s-loadbalancer
+---
+apiVersion: v1
+data:
+  haproxy.cfg: |+
+    # /etc/haproxy/haproxy.cfg
+    #---------------------------------------------------------------------
+    # Global settings
+    #---------------------------------------------------------------------
+    global
+        log stdout format raw local0
+
+    #---------------------------------------------------------------------
+    # common defaults that all the 'listen' and 'backend' sections will
+    # use if not designated in their block
+    #---------------------------------------------------------------------
+    defaults
+        mode                    tcp
+        log                     global
+        timeout connect 5s
+        timeout client  120s
+        timeout server  120s
+
+    #---------------------------------------------------------------------
+    # apiserver frontend which proxys to the control plane nodes
+    #---------------------------------------------------------------------
+    frontend proxy80
+        mode tcp
+        bind :80
+
+        # table used to store behaviour of source IPs (type is ip)
+        stick-table type ip size 200k expire 30s store  gpc0,conn_rate(10s)
+
+        # IPs that have gpc0 > 0 are blocked until the go away for at least 30 seconds
+        acl source_is_abuser src_get_gpc0 gt 0
+        tcp-request connection reject if source_is_abuser
+        acl conn_rate_abuse  src_conn_rate gt 80
+        acl mark_as_abuser   src_inc_gpc0  ge 0
+        tcp-request connection track-sc1 src
+        tcp-request connection reject if conn_rate_abuse mark_as_abuser
+
+        # Proteção whitelist de IP
+        #acl is_allow_ip src -f /whitelist/ip-whitelist.lst
+        #tcp-request connection reject if !is_allow_ip
+
+        default_backend ingress-backend80
+
+    frontend proxy443
+        mode tcp
+        bind :443
+
+        # table used to store behaviour of source IPs (type is ip)
+        stick-table type ip size 200k expire 30s store  gpc0,conn_rate(10s)
+
+        # IPs that have gpc0 > 0 are blocked until the go away for at least 30 seconds
+        acl source_is_abuser src_get_gpc0 gt 0
+        tcp-request connection reject if source_is_abuser
+        acl conn_rate_abuse  sc1_conn_rate gt 150
+        acl mark_as_abuser   sc1_inc_gpc0  ge 0
+        tcp-request connection track-sc1 src
+        tcp-request connection reject if conn_rate_abuse mark_as_abuser
+
+        # Proteção whitelist de IP
+        #acl is_allow_ip src -f /whitelist/ip-whitelist.lst
+        #tcp-request connection reject if !is_allow_ip
+
+        default_backend ingress-backend443
+
+    backend ingress-backend80
+        balance leastconn
+        {% for host in groups['controlplane'] %}
+        server {{ host }} {{ hostvars[host].ansible_host }}:{{ ingress_nginx_http_nodeport.stdout }} send-proxy-v2
+        {% endfor %}
+
+    backend ingress-backend443
+        balance leastconn
+         {% for host in groups['controlplane'] %}
+         server {{ host }} {{ hostvars[host].ansible_host }}:{{ ingress_nginx_https_nodeport.stdout }} send-proxy-v2
+         {% endfor %}
+
+kind: ConfigMap
+metadata:
+  name: haproxy-config
+  namespace: k8s-loadbalancer
+---
+apiVersion: v1
+data:
+  ip-whitelist.lst: |+
+    200.18.32.0/24
+    200.18.33.0/24
+    {% for host in groups['controlplane'] %}
+    {{ hostvars[host].ansible_host }}/32
+    {% endfor %}
+
+kind: ConfigMap
+metadata:
+  name: whitelist
+  namespace: k8s-loadbalancer
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: k8s-loadbalancer
+  namespace: k8s-loadbalancer
+spec:
+  selector:
+    matchLabels:
+      app: k8s-loadbalancer
+  template:
+    metadata:
+      labels:
+        app: k8s-loadbalancer
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-role.kubernetes.io/control-plane
+                operator: Exists
+      containers:
+      - image: haproxy:3.0.0-alpine
+        livenessProbe:
+          failureThreshold: 8
+          initialDelaySeconds: 30
+          periodSeconds: 60
+          tcpSocket:
+            port: 80
+          timeoutSeconds: 5
+        name: k8s-loadbalancer
+        securityContext:
+          capabilities:
+            add:
+            - NET_BIND_SERVICE
+          runAsUser: 0
+        volumeMounts:
+        - mountPath: /usr/local/etc/haproxy/haproxy.cfg
+          name: haproxy-config
+          readOnly: true
+          subPath: haproxy.cfg
+        - mountPath: /whitelist
+          name: whitelist
+          readOnly: true
+      hostNetwork: true
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+      volumes:
+      - configMap:
+          name: haproxy-config
+        name: haproxy-config
+      - configMap:
+          name: whitelist
+        name: whitelist

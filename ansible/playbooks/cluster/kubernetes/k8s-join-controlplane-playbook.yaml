@@ -1,0 +1,22 @@
+---
+- name: Imprimir o comando join para novos controleplane/workers
+  hosts: controlplane_init
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - k8s-print-join-command
+  tags:
+    - print-token
+
+- name: Fazer join dos nodes controlplane
+  hosts: controlplane_join
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - k8s-join-controlplane
+    - k8s-kubeconfig
+  tags:
+    - join-controlplane
+

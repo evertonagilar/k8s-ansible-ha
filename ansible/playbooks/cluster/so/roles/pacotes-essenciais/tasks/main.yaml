@@ -1,0 +1,26 @@
+---
+- name: Criar diretório /etc/apt/keyrings se não existe
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: 755
+
+- name: Instalação de pacotes essenciais no SO
+  apt:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - git
+    - vim
+    - zip
+    - apt-transport-https
+    - ca-certificates
+    - curl
+    - wget
+    - gnupg
+    - lsb-release
+    - iptables
+    - bash-completion
+    - python3-yaml
+    - python3-kubernetes
+

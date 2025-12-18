@@ -1,0 +1,45 @@
+---
+- name: Variáveis utilizadas para criar o NFS server
+  debug:
+    msg:
+      - "ansible_host = {{ ansible_host }}"
+      - "ansible_hostname = {{ ansible_hostname }}"
+      - "VOLUME_NFS = {{ VOLUME_NFS }}"
+
+- name: Verificando se o servidor NFS já está instalado
+  stat:
+    path: /etc/exports
+  register: nfs_instalado
+
+- name: Instalar NFS server
+  apt:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - nfs-kernel-server
+    - nfs-common
+  when: not nfs_instalado.stat.exists
+
+- name: Criar diretório dos volumes
+  file:
+    path: "{{ VOLUME_NFS }}"
+    state: directory
+    mode: 0777
+
+- name: Configurar arquivo /etc/exports
+  lineinfile:
+    dest: /etc/exports
+    state: present
+    line: "{{item}}"
+  with_items:
+    - "{{ VOLUME_NFS }} *(rw,no_subtree_check,sync,all_squash)"
+
+- name: Habilitar o NFS server
+  systemd:
+    name: nfs-kernel-server
+    enabled: yes
+    state: restarted
+  when: not nfs_instalado.stat.exists
+
+- name: Verifica se consegue montar volume NFS
+  include_tasks: nfs-check-allow-mount.yaml

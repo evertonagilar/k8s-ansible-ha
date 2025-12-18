@@ -1,0 +1,5 @@
+---
+- name: Uncordon node após atualização
+  kubernetes.core.k8s_drain:
+    state: uncordon
+    name: {{ ansible_hostname }}

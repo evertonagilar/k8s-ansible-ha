@@ -1,0 +1,41 @@
+---
+- name: Variáveis utilizadas para provisionar o firewall
+  debug:
+    msg:
+      - "ansible_host = {{ ansible_host }}"
+      - "ansible_hostname = {{ ansible_hostname }}"
+      - "group_names = {{ group_names }}"
+      - "groups = {{ groups }}"
+      - "IPTABLES.policy = {{ IPTABLES.policy }}"
+
+- name: Criar diretório /etc/iptables
+  file:
+    path: /etc/iptables
+    state: directory
+    mode: 0755
+
+- name: Instalar o script firewall-k8s-cpd.sh
+  ansible.builtin.template:
+    src: firewall-k8s-cpd.sh.j2
+    dest: /etc/iptables/firewall-k8s-cpd.sh
+    owner: root
+    mode: '0544'
+
+- name: Instalar o arquivo leiame.txt
+  ansible.builtin.template:
+    src: leiame.txt
+    dest: /etc/iptables/leiame.txt
+    mode: '0444'
+
+- name: Instalar o service firewall-k8s-cpd.service
+  ansible.builtin.template:
+    src: firewall-k8s-cpd.service
+    dest: /etc/systemd/system/firewall-k8s-cpd.service
+    mode: '0644'
+
+- name: Reiniciar o service firewall-k8s-cpd.service
+  systemd:
+    name: firewall-k8s-cpd.service
+    daemon_reload: true
+    enabled: yes
+    state: restarted

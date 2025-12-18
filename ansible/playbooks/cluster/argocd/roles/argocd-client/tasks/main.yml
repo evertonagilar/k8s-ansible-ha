@@ -1,0 +1,31 @@
+---
+- name: Variáveis utilizadas para provisionar argocd-client
+  debug:
+    msg:
+      - "ansible_host = {{ ansible_host }}"
+      - "ansible_hostname = {{ ansible_hostname }}"
+      - "ARGOCD.urlCLI = {{ ARGOCD.urlCLI }}"
+
+- name: Verificar se o cliente ArgoCD está instalado
+  command: which argocd
+  register: argocd_instalado
+  ignore_errors: true
+
+- name: Fazer download do cliente ArgoCD
+  get_url:
+    url: "{{ ARGOCD.urlCLI }}"
+    dest: /usr/local/bin/argocd
+  when: argocd_instalado.rc == 1
+
+- name: Tornar o binário argocd executável
+  file:
+    path: /usr/local/bin/argocd
+    mode: '0755'
+
+- name: Obter a versão do cliente ArgoCD
+  command: /usr/local/bin/argocd version --client
+  register: argocd_version
+
+- name: Exibir a versão do argocd
+  debug:
+    msg: "{{ argocd_version.stdout }}"

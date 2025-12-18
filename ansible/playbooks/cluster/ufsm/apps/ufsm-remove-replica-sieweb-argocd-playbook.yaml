@@ -1,0 +1,13 @@
+- name: Login ArgoCD
+  hosts: controlplane_init
+  become: yes
+  roles:
+    - argocd-login
+
+- name: Remover sieweb-desenv
+  hosts: controlplane_init
+  become: yes
+  vars_files:
+    - vars/replica-sieweb.yaml
+  roles:
+    - ufsm-remover-sieweb

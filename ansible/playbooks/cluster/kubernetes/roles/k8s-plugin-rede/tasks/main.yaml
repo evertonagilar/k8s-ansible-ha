@@ -1,0 +1,19 @@
+---
+- name: Variáveis utilizadas para instalar o plugin de rede Calico
+  debug:
+    msg:
+      - "VM_CALICO_VERSION = {{ VM_CALICO_VERSION }}"
+
+- name: Verificando se o cluster já existe
+  stat:
+    path: /etc/kubernetes/manifests/kube-apiserver.yaml
+  register: cluster_stat
+
+- name: Instalar plugin de rede Calico CNI
+  command: kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/{{ VM_CALICO_VERSION }}/manifests/calico.yaml
+  when: cluster_stat.stat.exists
+
+- name: Aguardar plugin de rede ficar pronto
+  shell: kubectl --kubeconfig=/etc/kubernetes/admin.conf wait --timeout=-1s --for=condition=Ready pod --all -n kube-system
+  args:
+    executable: /bin/bash

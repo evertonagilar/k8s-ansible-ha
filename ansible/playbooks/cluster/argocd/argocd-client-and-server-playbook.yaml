@@ -1,0 +1,20 @@
+---
+- name: Instalar o cliente ArgoCD
+  hosts: controlplane
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - argocd-client
+  tags:
+    - argocd-client
+
+- name: Provisionar ArgoCD server no Kubernetes
+  hosts: controlplane_init
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - argocd-server
+  tags:
+    - argocd-server

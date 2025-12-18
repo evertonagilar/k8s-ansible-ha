@@ -1,0 +1,9 @@
+- name: Instalar keepalived nos controlplanes
+  hosts: controlplane
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - keepalived
+  tags:
+    - keepalived

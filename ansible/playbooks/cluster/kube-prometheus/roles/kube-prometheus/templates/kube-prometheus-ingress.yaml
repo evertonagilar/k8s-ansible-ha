@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: k8s-dashboard-ingress
+  namespace: kubernetes-dashboard
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: HTTPS
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  labels:
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/name: kubernetes-dashboard
+    app.kubernetes.io/part-of: kubernetes-dashboard
+    app.kubernetes.io/version: 1.0.0
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - "{{ K8S_DASHBOARD.ingress.host }}"
+      secretName: k8s-dashboard-staging-tls
+  rules:
+    - host: "{{ K8S_DASHBOARD.ingress.host }}"
+      http:
+        paths:
+          - backend:
+              service:
+                name: kubernetes-dashboard
+                port:
+                  number: 443
+            path: /
+            pathType: Prefix

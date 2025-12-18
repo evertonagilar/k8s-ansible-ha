@@ -1,0 +1,14 @@
+[Unit]
+Description=Habilitar o DNAT para o novo proxy reverso dos portais
+After=network.target
+Wants=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/etc/iptables/cpd-dnat-portal.sh start
+ExecStop=/etc/iptables/cpd-dnat-portal.sh stop
+ExecReload=/etc/iptables/cpd-dnat-portal.sh restart
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target

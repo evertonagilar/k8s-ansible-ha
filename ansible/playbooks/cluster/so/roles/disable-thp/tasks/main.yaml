@@ -1,0 +1,13 @@
+---
+- name: Instalar o service disable-thp.service
+  ansible.builtin.template:
+    src: disable-thp.service
+    dest: /etc/systemd/system/disable-thp.service
+    mode: '0644'
+
+- name: Reiniciar o service disable-thp.service
+  systemd:
+    name: disable-thp.service
+    daemon_reload: true
+    enabled: yes
+    state: restarted

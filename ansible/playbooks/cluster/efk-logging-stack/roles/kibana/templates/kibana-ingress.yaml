@@ -1,0 +1,28 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kibana-ingress
+  namespace: efk-logging
+  annotations:
+    #nginx.ingress.kubernetes.io/backend-protocol: HTTPS
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/whitelist-source-range: "{{ EFK_LOGGING.kibana.ingress.whitelist }}"
+    nginx.ingress.kubernetes.io/limit-connections: "{{ EFK_LOGGING.kibana.ingress.limitConnections }}"
+    cert-manager.io/cluster-issuer: "{{ EFK_LOGGING.kibana.ingress.clusterIssuer }}"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - "{{ EFK_LOGGING.kibana.ingress.host }}"
+      secretName: "{{ EFK_LOGGING.kibana.ingress.secretName }}"
+  rules:
+    - host: "{{ EFK_LOGGING.kibana.ingress.host }}"
+      http:
+        paths:
+          - backend:
+              service:
+                name: kibana
+                port:
+                  number: 5601
+            path: /
+            pathType: Prefix

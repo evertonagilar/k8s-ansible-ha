@@ -1,0 +1,8 @@
+---
+- name: Baixar as imagens do Kubernetes {{ VM_K8S_VERSION }}
+  hosts: controlplane worker
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - k8s-baixar-imagens

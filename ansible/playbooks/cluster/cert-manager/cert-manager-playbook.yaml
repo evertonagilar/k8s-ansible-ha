@@ -1,0 +1,8 @@
+---
+- name: Provisionar Cert-manager no Kubernetes
+  hosts: controlplane_init
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - cert-manager

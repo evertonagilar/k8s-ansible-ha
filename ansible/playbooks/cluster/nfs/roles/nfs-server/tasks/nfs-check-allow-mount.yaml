@@ -1,0 +1,30 @@
+---
+- name: Cria pasta temporária para montagem de teste
+  tempfile:
+    state: directory
+  register: temp_mount
+
+- name: Montar {{ ansible_host }}:{{ VOLUME_NFS }} em {{ temp_mount.path }}"
+  command: "mount -t nfs {{ ansible_host }}:{{ VOLUME_NFS }} {{ temp_mount.path }}"
+  register: mount_result
+  ignore_errors: true
+
+- name: Desmontar volume de teste
+  command: "umount {{ temp_mount.path }}"
+  when: mount_result.rc == 0
+
+- name: Remover pasta temporária
+  file:
+    path: "{{ temp_mount.path }}"
+    state: absent
+  when: mount_result.rc == 0
+
+- name: Print success message
+  debug:
+    msg: "Pode montar volume NFS sem problemas!"
+  when: mount_result.rc == 0
+
+- name: Print error message
+  debug:
+    msg: "Não foi possível montar o volume NFS."
+  when: mount_result.rc != 0

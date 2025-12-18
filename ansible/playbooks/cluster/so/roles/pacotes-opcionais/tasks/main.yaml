@@ -1,0 +1,35 @@
+---
+- name: Variáveis utilizadas para instalar pacotes opcionais
+  debug:
+    msg:
+      - "ansible_host = {{ ansible_host }}"
+      - "ansible_hostname = {{ ansible_hostname }}"
+      - "ansible_distribution = {{ ansible_distribution }}"
+      - "ansible_distribution_release = {{ ansible_distribution_release }}"
+
+- name: Definir lista de pacotes de acordo com a distribuição
+  set_fact:
+    package_list: |
+      {% if ansible_distribution == 'Debian' %}
+      [
+        "bind9-dnsutils",
+        "nmap",
+        "htop",
+        "iptraf-ng",
+        "tmux"
+      ]
+      {% elif ansible_distribution == 'Ubuntu' %}
+      [
+        "bind9-dnsutils",
+        "nmap",
+        "htop",
+        "iptraf-ng",
+        "tmux"
+      ]
+      {% endif %}
+
+- name: Instalação de pacotes opcionais no SO
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ package_list | from_yaml }}"

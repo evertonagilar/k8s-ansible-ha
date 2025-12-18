@@ -1,0 +1,370 @@
+# *********** Settings Local ***********
+
+# Config Kubernetes
+VM_CONTAINER_VERSION: "1.7.27-1"
+VM_CONTAINER_SANDBOX_IMAGE: "registry.k8s.io/pause:3.10.1"
+VM_K8S_VERSION: "1.34.1-1.1"
+VM_K8S_REPO: "v1.34"
+VM_CALICO_VERSION: "v3.27.1"
+VM_POD_NETWORK_CIDR: "10.244.0.0/16"
+VM_SERVICE_CIDR: "10.96.0.0/12"
+VM_CLUSTER_DOMAIN: "local.br"
+VM_CLUSTER_NAME: "k8s"
+VM_CONTROL_PLANE_ENDPOINT: "{{ VM_CLUSTER_NAME }}.{{ VM_CLUSTER_DOMAIN }}:6443"
+VM_HELM_VERSION: "v3.19.0"
+VM_CSI_DRIVER_NFS_VERSION: "v4.7.0"
+VM_AMBIENTE: "local"
+
+# Keepalived
+VM_VIRTUAL_IP: "192.168.20.10"
+VM_VRRP_INTERFACE: eth1
+VM_VRRP_PASSWD: IliKeK8s
+
+KUBELET:
+  container_log_max_size: "100Ki"
+  container_log_max_files: 5
+  minimum_container_ttl_duration: 5m
+  maximum_dead_containers_per_container: 3
+  backup_log_path: /var/log/k8s-log-backup
+  backup_pattern: "dev-*"
+  backup_remove_after_copy: false
+
+# Storage class path
+VOLUME_BASE_PATH: "/srv/cluster"
+VOLUME_NFS: "{{ VOLUME_BASE_PATH }}/nfs"
+
+# Hosts para incluir no /etc/hosts de cada host do cluster
+hosts_entries:
+- "192.168.20.10   k8s.local.br"
+- "192.168.20.11   vm-controlplane-01.local.br"
+- "192.168.20.12   vm-controlplane-02.local.br"
+- "192.168.20.13   vm-controlplane-03.local.br"
+- "192.168.20.16   vm-worker-01.local.br"
+- "192.168.20.17   vm-worker-02.local.br"
+- "192.168.20.18   vm-worker-02.local.br"
+- "192.168.20.10   k8s-dashboard.k8s.local.br"
+- "192.168.20.10   argocd.k8s.local.br"
+- "192.168.20.10   kibana.k8s.local.br"
+
+CERT_MANAGER:
+  url: https://github.com/cert-manager/cert-manager/releases/download/v1.15.1/cert-manager.yaml
+  acme:
+    email: evertonagilar@gmail.com
+
+ARGOCD:
+  url: "https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml"
+  urlCLI: "https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64"
+  username: admin
+  password: i9WaGYe5aC5eRVt2
+  ingress:
+    clusterIssuer: letsencrypt-staging
+    secretName: argocd-staging-tls
+    host: argocd.k8s.local.br
+    whitelist: ""
+    limitConnections: "12"
+
+K8S_DASHBOARD:
+  url: https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml
+  ingress:
+    clusterIssuer: letsencrypt-staging
+    secretName: k8s-dashboard-staging-tls
+    host: k8s-dashboard.k8s.local.br
+    whitelist: ""
+    limitConnections: "12"
+
+EFK_LOGGING:
+  elasticsearch:
+    nodeName: vm-worker-01
+    volumePath: "{{ VOLUME_BASE_PATH }}/local/elasticsearch"
+  kibana:
+    nodeName: vm-worker-01
+    volumePath: "{{ VOLUME_BASE_PATH }}/local/kibana"
+    ingress:
+      clusterIssuer: letsencrypt-staging
+      secretName: kibana-staging-tls
+      host: kibana.k8s.local.br
+      whitelist: ""
+      limitConnections: "120" # Se diminuir vai dar erro ao abrir o dashboard
+
+METALLB:
+  url: "https://raw.githubusercontent.com/metallb/metallb/v0.14.4/config/manifests/metallb-native.yaml"
+
+###################################### Repositórios #########################################################
+
+# Gitlab
+GITLAB:
+  user: builder
+  host: alpha.cpd.ufsm.br
+  workspace: devops/kubernetes/project-manifests
+  token: glpat-djR1iYaezWsfZm64uib1
+
+REPO_SIEWEB:
+  repo: https://{{ GITLAB.user }}:{{ GITLAB.token }}@{{ GITLAB.host }}/{{ GITLAB.workspace }}/k8s-sieweb.git
+  dest_server: https://kubernetes.default.svc
+  sync_policy: none
+  revision: main
+
+REPO_SIEWEB_REDIS:
+  repo: https://{{ GITLAB.user }}:{{ GITLAB.token }}@{{ GITLAB.host }}/{{ GITLAB.workspace }}/k8s-sieweb-redis.git
+  dest_server: https://kubernetes.default.svc
+  sync_policy: none
+  revision: main
+
+REPO_SIEWEB_ASSETS:
+  repo: https://{{ GITLAB.user }}:{{ GITLAB.token }}@{{ GITLAB.host }}/{{ GITLAB.workspace }}/k8s-sieweb-assets.git
+  dest_server: https://kubernetes.default.svc
+  sync_policy: none
+  revision: main
+
+REPO_PORTAL:
+  repo: https://{{ GITLAB.user }}:{{ GITLAB.token }}@{{ GITLAB.host }}/{{ GITLAB.workspace }}/k8s-portal.git
+  dest_server: https://kubernetes.default.svc
+  sync_policy: none
+  revision: main
+
+REPO_PROXY_TCP:
+  repo: https://{{ GITLAB.user }}:{{ GITLAB.token }}@{{ GITLAB.host }}/{{ GITLAB.workspace }}/k8s-proxy-tcp.git
+  dest_server: https://kubernetes.default.svc
+  sync_policy: none
+  revision: main
+  path: overlays/local
+
+REPO_PROXY_REVERSO:
+  repo: https://{{ GITLAB.user }}:{{ GITLAB.token }}@{{ GITLAB.host }}/{{ GITLAB.workspace }}/k8s-proxy-reverso.git
+  dest_server: https://kubernetes.default.svc
+  sync_policy: none
+  revision: main
+  path: overlays/local
+
+###################################### Segurança #########################################################
+#
+# Firewall para implementar a baseline de segurança do cluster Kubernetes
+#
+# Variáveis que podem ser usados nos parâmetros from.ip_src.ip ou from.ip_src.nodes:
+#   - controlplane   -> resolve para os IPs de nodes que são controlplane
+#   - worker         -> resolve para os IPs de nodes que são worker
+#   - all            -> resolve para todos os IPs de nodes
+#   - virtualip      -> resolve para o virtual IP (Parâmetro VM_VIRTUAL_IP) utilizado pelo keepalived dos controlplanes
+#   - proxy          -> resolve para os nodes que são proxy
+#   - nfs            -> resolve para o IP do servidor NFS
+#
+#
+# Observações:
+#    - O nome dos serviços IPTABLES.accept.xxx pode ter no máximo 28 caracteres (tamanho máximo da chain iptables)
+#    - Provisionar em um nó primeiramente para analisar o impacto
+#
+# Comando para provisionar apenas em um nó com parâmetro --limit
+# ansible-playbook -e @settings-local.yaml -i inventory-local.ini playbooks/cluster/iptables/iptables-cluster-playbook.yaml --limit vm-controlplane-01
+#
+#  Comando para analisar pacotes dropados no log (remover após análise)
+#  iptables -A INPUT -j LOG --log-prefix "pacote dropado"
+#
+###############################################################################################
+IPTABLES:
+  policy: DROP
+  accept:
+    icmp:
+      protocol: icmp
+      description: Permitir ping
+      from:
+        ip_src:
+        - ip: all
+          comment: Ping entre os nodes
+          nodes: all
+        - ip: 10.0.2.15/24
+          comment: IP NAT vagrant (eth0)
+          nodes: all
+        - ip: 192.168.20.0/24
+          comment: Rede externa vagrant (eth1)
+          nodes: all
+        - ip: 200.18.32.0/24
+          comment: Rede interna CPD
+          audit: yes
+          rateLimit:
+            # Rate limit
+            enable: yes
+            limitBurst: 20 # Permite até 20 pacotes de pico até começar a limitar a taxa.
+            limitAbove: 10/sec # Permite 10 pacotes por segundo
+          nodes: proxy
+
+    http:
+      port: "443,80"
+      protocol: tcp
+      description: Permitir HTTP/HTTPS
+      from:
+        ip_src:
+        - ip: 200.18.32.7/32
+          comment: Everton Agilar CPD
+          nodes: all
+        - ip: 200.18.32.0/24 # rede interna CPD
+          comment: rede interna do CPD
+          nodes: proxy
+          rateLimit:
+            enable: yes
+            limitBurst: 150 # Permite 150 pacotes de pico até começar a taxar
+            limitAbove: 250/sec # Permite 250 pacotes por segundo
+        - ip: 192.168.20.0/24
+          comment: Rede externa vagrant (eth1)
+          nodes: all
+        mac_src:
+        - addr: b8:08:cf:fc:0e:5e
+          comment: Everton Agilar Casa
+          nodes: all
+
+    ssh:
+      port: 22
+      protocol: tcp
+      description: Permitir SSH
+      from:
+        ip_src:
+        - ip: 10.0.2.15/24
+          comment: vagrant (eth0)
+          nodes: all
+        - ip: 192.168.20.0/24
+          comment: Rede externa vagrant (eth1)
+          nodes: all
+        - ip: 200.18.32.7/32
+          comment: Everton Agilar
+          nodes: all
+        - ip: 192.168.20.9/32
+          comment: Servidor Ansible
+          nodes: all
+
+    admin:
+      protocol: all
+      description: Admins do cluster
+      from:
+        ip_src:
+        - ip: 200.18.32.7/32
+          comment: Everton Agilar
+          nodes: all
+          audit: yes
+        - ip: 192.168.100.20/32
+          comment: Everton Agilar - PC Casa
+          nodes: all
+        - ip: 192.168.20.9/32
+          comment: Servidor Ansible
+          nodes: all
+
+    cluster_network:
+      protocol: all
+      description: Cluster network
+      from:
+        ip_src:
+        - ip: 10.244.0.0/16
+          comment: "POD networkd cidr"
+          nodes: all
+        - ip: 10.96.0.0/12
+          comment: "Service network cidr"
+          nodes: all
+
+    etcd:
+      port: "2380,2379"
+      protocol: tcp
+      description: Permitir controlplane acessar etcd
+      from:
+        ip_src:
+        - ip: controlplane
+          comment: "etcd"
+          nodes: controlplane
+
+    kubelet:
+      port: 10250
+      protocol: tcp
+      description: Permitir acesso ao kubelet entre os nodes
+      from:
+        ip_src:
+        - ip: all
+          comment: "kubelet"
+          nodes: all
+
+    api_server:
+      port: 6443
+      protocol: tcp
+      description: Permitir acesso ao ApiServer
+      from:
+        ip_src:
+        - ip: virtualip
+          comment: nodes podem acessar api server via IP virtual do keepalived
+          nodes: controlplane
+        - ip: all
+          comment: nodes
+          nodes: controlplane
+        - ip: 200.18.32.7/32
+          comment: Everton Agilar
+          nodes: controlplane
+        - ip: 192.168.20.0/24
+          comment: Rede externa vagrant (eth1)
+          nodes: all
+
+    ingress:
+      port: 31779
+      protocol: tcp
+      description: Permitir acesso ao ingress
+      from:
+        ip_src:
+        - ip: 200.18.33.0/24
+          comment: Rede DMZ
+          nodes: all
+        - ip: 200.18.32.0/24
+          comment: Rede interna
+          nodes: all
+
+    calico:
+      port: "179,5473,4789,51820,51821"
+      protocol: tcp
+      description: Permitir plugin rede calico acessar nodes
+      from:
+        ip_src:
+        - ip: all
+          comment: "Calico ports"
+          nodes: all
+
+    kube_controllers:
+      port: "10257,10259"
+      protocol: tcp
+      description: Permitir kube-controller-manager e kube-scheduller
+      from:
+        ip_src:
+        - ip: all
+          comment: "kube-controller-manager/kube-scheduller ports"
+          nodes: all
+
+    nfs:
+      port: "111,2049"
+      protocol: tcp
+      description: Permitir acesso ao servidor NFS
+      from:
+        ip_src:
+        - ip: all
+          comment: "NFS ports"
+          nodes: nfs
+
+    keepalived:
+      protocol: vrrp
+      description: Permitir VRRP entre controlplanes
+      from:
+        ip_src:
+        - ip: controlplane
+          comment: "VRRP"
+          nodes: controlplane
+
+  deny:
+    tcp:
+      # Bloquear portas TCP conhecidas que o cluster não utiliza
+      # 20,21: FTP
+      # 23: Telnet
+      # 110 e 143: POP3 e IMAP (email)
+      # 137-139: NetBIOS (Windows file sharing)
+      # 3389: RDP (Remote Desktop Protocol)
+      # 5900: VNC (Virtual Network Computing)
+      # 4848: Admin Console do Payara/GlassFish
+      # 1194: OpenVPN
+      ports: 20,21,23,110,143,137,138,139,3389,5900,4848,1194
+    udp:
+      # Bloquear portas UDP conhecidas que o cluster não utiliza
+      # 137, 138, 139 (NetBIOS): Usadas para compartilhamento de arquivos e impressoras no Windows.
+      # 1194 (OpenVPN): Porta padrão usada pelo OpenVPN.
+      # 1900 (SSDP): Usada pelo protocolo SSDP (parte do UPnP, comumente usado para descoberta de dispositivos).
+      # 5353 (mDNS): Usada para descoberta de serviços em redes locais (multicast DNS).
+      ports: 137,138,139,1194,1900,5353

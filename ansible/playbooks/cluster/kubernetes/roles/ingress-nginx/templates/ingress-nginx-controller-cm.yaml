@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+data:
+  allow-snippet-annotations: "true"
+  proxy-body-size: "120m"
+  proxy-read-timeout: "1200"
+  use-proxy-protocol: "true"
+  ignore-invalid-headers: "false"
+  underscores-in-headers: "true"
+  annotations-risk-level: Critical
+metadata:
+  name: ingress-nginx-controller
+  namespace: ingress-nginx

@@ -1,0 +1,47 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+VM_BOX = "bento/ubuntu-24.04"
+VM_CLUSTER_GROUP = "/VagrantMultiNode"
+VM_IP = "192.168.20.8"
+VM_MASQUERADE_RULE = "POSTROUTING -t nat -s 192.168.20.0/24 ! -d 192.168.20.0/24 -j MASQUERADE"
+
+# Gerar chaves SSH se não existirem
+SSH_KEY_PATH = "../common/ssh/k8s-multinode"
+if !File.exist?(SSH_KEY_PATH)
+  puts "Chaves SSH não encontradas via proxyfw/Vagrantfile. Gerando novas chaves em #{SSH_KEY_PATH}..."
+  # Garantir que o diretório existe
+  File.dirname(SSH_KEY_PATH).tap { |dir| Dir.mkdir(dir) unless Dir.exist?(dir) }
+  # Gerar a chave sem senha (-N "") e sobrescrever se necessário (-f)
+  system("ssh-keygen -t rsa -b 4096 -f #{SSH_KEY_PATH} -N '' -C 'k8s-multinode'")
+  # Garantir permissões corretas
+  File.chmod(0600, SSH_KEY_PATH)
+  File.chmod(0644, "#{SSH_KEY_PATH}.pub")
+end
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "#{VM_BOX}"
+  config.vm.box_check_update = false
+  #config.vbguest.auto_update = false
+  config.vm.provider "virtualbox" do |v|
+    v.name = "vm-proxyfw"
+    v.memory = 800
+    v.cpus = 1
+    v.customize ["modifyvm", :id, "--groups", VM_CLUSTER_GROUP]
+  end
+  config.vm.hostname = "vm-proxyfw"
+  config.vm.network "private_network", ip: VM_IP, hostname: true
+  config.vm.provision "file", source: "../common", destination: "~/common"
+  config.vm.provision "shell", path: "bootstrap.sh"
+
+  # Habilitar compartilhamento da Internet
+  config.vm.provision "shell",
+    run: "always",
+    inline: <<-SHELL
+        if ! /bin/sh -c "iptables -C #{VM_MASQUERADE_RULE} 2> /dev/null" ; then
+            echo "Habilitando compartilhamento da Internet..."
+            /bin/sh -c "iptables -A #{VM_MASQUERADE_RULE}"
+            [ $? == 0 ] || die "Erro ao criar regra iptables: #{VM_MASQUERADE_RULE}"
+        fi
+  SHELL
+
+end

@@ -1,0 +1,3 @@
+NAMESPACE: dev-sieweb-redis
+NOME_APP: dev-sieweb-redis
+OVERLAY_PATH: overlays/dev

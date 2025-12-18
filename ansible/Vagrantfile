@@ -1,0 +1,26 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+VM_BOX = "boxomatic/debian-12"
+VM_BOX_VERSION = "20240225.0.1"
+VM_IP = "192.168.20.9"
+VM_HOSTNAME = "vm-ansible"
+VM_CLUSTER_GROUP = "/VagrantMultiNode"
+VM_K8S_VERSION = "1.34.1-1.1"
+VM_K8S_REPO = "v1.34"
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "#{VM_BOX}"
+  config.vm.box_version = "#{VM_BOX_VERSION}"
+  config.vm.box_check_update = false
+  config.vm.hostname = VM_HOSTNAME
+  config.vm.network "private_network", ip: VM_IP, hostname: true
+  config.vm.provider "virtualbox" do |v|
+    v.name = VM_HOSTNAME
+    v.memory = 700
+    v.cpus = 1
+    v.customize ["modifyvm", :id, "--groups", VM_CLUSTER_GROUP]
+  end
+  config.vm.provision "file", source: "../common", destination: "~/common"
+  config.vm.provision "shell", path: "bootstrap.sh", env: { "VM_K8S_VERSION" => VM_K8S_VERSION, "VM_K8S_REPO" => VM_K8S_REPO }
+end

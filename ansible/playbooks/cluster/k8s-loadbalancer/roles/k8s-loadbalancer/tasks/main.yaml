@@ -1,0 +1,38 @@
+---
+- name: Obter nodePort HTTPS ingress nginx
+  shell: kubectl -n ingress-nginx get svc/ingress-nginx-controller -o jsonpath='{ .spec.ports[?(@.port==443)].nodePort }'
+  register: ingress_nginx_https_nodeport
+
+- name: Obter nodePort HTTP ingress nginx
+  shell: kubectl -n ingress-nginx get svc/ingress-nginx-controller -o jsonpath='{ .spec.ports[?(@.port==80)].nodePort }'
+  register: ingress_nginx_http_nodeport
+
+- name: Variáveis utilizadas para provisionar k8s-loadbalancer
+  debug:
+    msg:
+      - "ansible_host = {{ ansible_host }}"
+      - "ansible_hostname = {{ ansible_hostname }}"
+      - "ingress_nginx_https_nodeport = {{ ingress_nginx_https_nodeport.stdout }}"
+      - "ingress_nginx_http_nodeport = {{ ingress_nginx_http_nodeport.stdout }}"
+
+
+- name: Copiar a pasta templates/base para {{ ansible_hostname }}
+  copy:
+    src: templates/base
+    dest: /tmp/k8s-loadbalancer/templates
+    remote_src: no
+
+- name: Kustomizar o manifesto k8s-loadbalancer a partir dos templates
+  shell: kubectl kustomize /tmp/k8s-loadbalancer/templates/base > /tmp/k8s-loadbalancer/templates/k8s-loadbalancer.yaml
+
+- name: Copiar o manifesto de volta para o projeto
+  fetch:
+    src: /tmp/k8s-loadbalancer/templates/k8s-loadbalancer.yaml
+    dest: ./roles/k8s-loadbalancer/templates/k8s-loadbalancer.yaml
+    flat: yes
+
+- name: Provisionar o k8s-loadbalancer
+  kubernetes.core.k8s:
+    state: present
+    force: yes   # Ansible doc: If set to yes, and state is present, an existing object will be replaced.
+    template: k8s-loadbalancer.yaml

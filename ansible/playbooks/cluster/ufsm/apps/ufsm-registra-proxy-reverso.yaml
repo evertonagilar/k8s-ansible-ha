@@ -1,0 +1,12 @@
+- name: Login ArgoCD
+  hosts: controlplane_init
+  become: yes
+  roles:
+    - argocd-login
+
+- name: Provisionar proxy-reverso no ArgoCD
+  hosts: controlplane_init
+  become: yes
+  roles:
+    - provisiona-proxy-reverso
+

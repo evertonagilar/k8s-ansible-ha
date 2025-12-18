@@ -1,0 +1,34 @@
+---
+- name: Variáveis utilizadas para provisionar cert-manager
+  debug:
+    msg:
+      - "VM_AMBIENTE = {{ VM_AMBIENTE }}"
+      - "CERT_MANAGER.url = {{ CERT_MANAGER.url }}"
+      - "CERT_MANAGER.acme.email = {{ CERT_MANAGER.acme.email }}"
+
+- name: Instala Cert-Manager
+  kubernetes.core.k8s:
+    namespace: cert-manager
+    src: "{{ CERT_MANAGER.url }}"
+    state: present
+    wait: yes
+  tags:
+    - cert-manager
+
+- name: Provisionar ClusterIssuer letsencrypt-staging
+  kubernetes.core.k8s:
+    template: letsencrypt-staging.yaml
+    state: present
+  tags:
+    - clusterissuer
+
+- name: Provisionar ClusterIssuer letsencrypt-prod (Somente produção)
+  kubernetes.core.k8s:
+    template: letsencrypt-prod.yaml
+    state: present
+  when: VM_AMBIENTE == "producao" or VM_AMBIENTE == "production"
+  tags:
+    - clusterissuer
+
+
+

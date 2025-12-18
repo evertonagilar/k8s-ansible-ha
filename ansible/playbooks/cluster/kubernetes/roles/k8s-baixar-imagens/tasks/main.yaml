@@ -1,0 +1,10 @@
+---
+- name: Variáveis utilizadas para k8s-common
+  debug:
+    msg:
+      - "ansible_host = {{ ansible_host }}"
+      - "ansible_hostname = {{ ansible_hostname }}"
+      - "VM_K8S_VERSION = {{ VM_K8S_VERSION }}"
+
+- name: Baixar as imagens do Kubernetes {{ VM_K8S_VERSION }}
+  command: kubeadm config images pull --cri-socket unix:///run/containerd/containerd.sock

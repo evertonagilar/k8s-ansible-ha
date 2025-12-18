@@ -1,0 +1,30 @@
+---
+- name: Variáveis utilizadas para provisionar backup-jobs-ds
+  debug:
+    msg:
+      - "ansible_host = {{ ansible_host }}"
+      - "ansible_hostname = {{ ansible_hostname }}"
+      - "KUBELET.backup_log_path = {{ KUBELET.backup_log_path }}"
+      - "KUBELET.backup_pattern = {{ KUBELET.backup_pattern }}"
+      - "KUBELET.backup_remove_after_copy = {{ KUBELET.backup_remove_after_copy }}"
+
+- name: Criar namespace backup-jobs
+  kubernetes.core.k8s:
+    name: backup-jobs
+    api_version: v1
+    kind: Namespace
+    state: present
+
+- name: Criar diretório de backup para armazenar os logs rotacionados
+  file:
+    path: "{{ KUBELET.backup_log_path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Provisionar job backups-logs
+  kubernetes.core.k8s:
+    template: backup-logs-ds.yaml
+    state: present
+    force: yes   # Ansible doc: If set to yes, and state is present, an existing object will be replaced.

@@ -1,0 +1,5 @@
+- name: Configurar o sysctl
+  hosts: controlplane worker
+  become: yes
+  roles:
+    - sysctl-config

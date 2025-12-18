@@ -1,0 +1,44 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: etcd-backup
+  namespace: backup-jobs
+spec:
+  schedule: "0 2 * * *"  # Executa o backup todos os dias às 02:00
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: node-role.kubernetes.io/control-plane
+                        operator: Exists
+          containers:
+            - name: etcd-backup
+              image: bitnami/etcd:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  etcdctl --endpoints=https://{{ ansible_host }}:2379 --cacert=/certs/ca.crt --cert=/certs/etcd.crt --key=/certs/etcd.key snapshot save /backup/etcd-backup-$(date +%a).db
+              volumeMounts:
+                - name: etcd-certs
+                  mountPath: /certs
+                  readOnly: true
+                - name: etcd-backup-vol
+                  mountPath: /backup
+          restartPolicy: OnFailure
+          volumes:
+            - name: etcd-backup-vol
+              hostPath:
+                path: /opt/backup/etcd
+                type: DirectoryOrCreate
+            - name: etcd-certs
+              secret:
+                secretName: etcd-certs

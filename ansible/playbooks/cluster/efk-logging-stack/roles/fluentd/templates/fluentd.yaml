@@ -1,0 +1,571 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: fluentd
+  name: fluentd
+  namespace: efk-logging
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app: fluentd
+  name: fluentd
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: fluentd
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: fluentd
+subjects:
+- kind: ServiceAccount
+  name: fluentd
+  namespace: efk-logging
+---
+apiVersion: v1
+data:
+  efk-k8s-loadbalancer.conf: |
+    <source>
+      @type tail
+      @id k8s-loadbalancer
+      path /var/log/containers/k8s-loadbalancer-*.log
+      pos_file /var/log/fluentd.k8s-loadbalancer.log.pos
+      tag k8s-loadbalancer
+      read_from_head false
+      format /^(?<timestamp>[^\s]+) (?<stream>stdout|stderr) F Connect from (?<source_ip>[^\:]+):(?<source_port>[^\s]+) to (?<dest_ip>[^\:]+):(?<dest_port>[^\s]+) \((?<proxy>[^\)]+)\)$/
+    </source>
+    <match k8s-loadbalancer>
+        @type elasticsearch
+        @id out_es_k8s_loadbalancer
+        @log_level info
+        include_tag_key false
+        host "#{ENV['FLUENT_ELASTICSEARCH_HOST']}"
+        port "#{ENV['FLUENT_ELASTICSEARCH_PORT']}"
+        path ''
+        user "#{ENV['FLUENT_ELASTICSEARCH_USER'] || ''}"
+        password "#{ENV['FLUENT_ELASTICSEARCH_PASSWORD'] || ''}"
+        scheme "#{ENV['FLUENT_ELASTICSEARCH_SCHEME'] || 'http'}"
+        ssl_verify "#{ENV['FLUENT_ELASTICSEARCH_SSL_VERIFY'] || 'true'}"
+        ssl_version "#{ENV['FLUENT_ELASTICSEARCH_SSL_VERSION'] || 'TLSv1_2'}"
+        reload_connections 'false'
+        reconnect_on_error 'true'
+        reload_on_failure 'true'
+        log_es_400_reason 'true'
+        logstash_prefix 'k8s-loadbalancer'
+        logstash_format 'true'
+        index_name 'k8s-loadbalancer'
+        type_name 'fluentd'
+        <buffer>
+         flush_thread_count '8'
+         flush_interval '5s'
+         chunk_limit_size '2M'
+         queue_limit_length '32'
+         retry_max_interval '30'
+         retry_forever 'true'
+        </buffer>
+    </match>
+  efk-ufsm-proxy-reverso.conf: |
+    <source>
+      @type tail
+      @id proxy-reverso
+      path /var/log/containers/proxy-reverso-*.log
+      pos_file /var/log/fluentd.proxy-reverso.log.pos
+      tag proxy-reverso
+      read_from_head false
+      # exemplo: 2024-09-06T08:55:20.375546017-03:00 stdout F 200.18.32.7:30104 [06/Sep/2024:11:55:19.902] http~ desenv-host-backend/server1 0/0/0/471/471 200 1382 - - --NI 1/1/0/0/0 0/0 {desenv.portal.ufsm.br|2} {} "POST https://desenv.portal.ufsm.br/caixapostal/marcadoresDocumentos.json HTTP/2.0"
+      format /^(?<timestamp>[^\s]+) (?<stream>stdout|stderr) F (?<source_ip>[^\:]+):(?<source_port>[^\s]+) \[(?<timestamp2>[^\]]+)\] (?<proxy>\S+) (?<backend>\S+) (?<flags>[^{]+) {(?<info>[^}]+)} {(?<info2>[^}]+)} \"(?<method>[A-Z]+) (?<uri_proto>[^\:]+):\/\/(?<domain>[^\/\?]+)(?<path>[^\?]*)\??(?<qs>.*)? (?<protocol>[^\"]+)"$/
+    </source>
+    <match proxy-reverso>
+        @type elasticsearch
+        @id out_es_proxy_reverso
+        @log_level info
+        include_tag_key false
+        remove_keys timestamp2,uri_proto
+        host "#{ENV['FLUENT_ELASTICSEARCH_HOST']}"
+        port "#{ENV['FLUENT_ELASTICSEARCH_PORT']}"
+        path ''
+        user "#{ENV['FLUENT_ELASTICSEARCH_USER'] || ''}"
+        password "#{ENV['FLUENT_ELASTICSEARCH_PASSWORD'] || ''}"
+        scheme "#{ENV['FLUENT_ELASTICSEARCH_SCHEME'] || 'http'}"
+        ssl_verify "#{ENV['FLUENT_ELASTICSEARCH_SSL_VERIFY'] || 'true'}"
+        ssl_version "#{ENV['FLUENT_ELASTICSEARCH_SSL_VERSION'] || 'TLSv1_2'}"
+        reload_connections 'false'
+        reconnect_on_error 'true'
+        reload_on_failure 'true'
+        log_es_400_reason 'true'
+        logstash_prefix 'proxy-reverso'
+        logstash_format 'true'
+        index_name 'proxy-reverso'
+        type_name 'fluentd'
+        <buffer>
+         flush_thread_count '8'
+         flush_interval '5s'
+         chunk_limit_size '2M'
+         queue_limit_length '32'
+         retry_max_interval '30'
+         retry_forever 'true'
+        </buffer>
+    </match>
+  efk-ufsm-proxy-tcp.conf: |
+    <source>
+      @type tail
+      @id proxy-tcp
+      path /var/log/containers/proxy-tcp-*.log
+      pos_file /var/log/fluentd.proxy-tcp.log.pos
+      tag proxy-tcp
+      read_from_head false
+      # exemplo: 2024-09-06T07:56:30.888846087-03:00 stdout F 200.18.32.7:31962 [06/Sep/2024:10:53:40.235] proxy443 backend443/server1 1/1/170652 6419 -- 1/1/0/0/0 0/0
+      format /^(?<timestamp>[^\s]+) (?<stream>stdout|stderr) F (?<source_ip>[^\:]+):(?<source_port>[^\s]+) \[(?<timestamp2>[^\]]+)\] (?<proxy>\S+) (?<backend>\S+) (?<info>.*)$/
+    </source>
+    <match proxy-tcp>
+        @type elasticsearch
+        @id out_es_proxy_tcp
+        @log_level info
+        include_tag_key false
+        remove_keys timestamp2
+        host "#{ENV['FLUENT_ELASTICSEARCH_HOST']}"
+        port "#{ENV['FLUENT_ELASTICSEARCH_PORT']}"
+        path ''
+        user "#{ENV['FLUENT_ELASTICSEARCH_USER'] || ''}"
+        password "#{ENV['FLUENT_ELASTICSEARCH_PASSWORD'] || ''}"
+        scheme "#{ENV['FLUENT_ELASTICSEARCH_SCHEME'] || 'http'}"
+        ssl_verify "#{ENV['FLUENT_ELASTICSEARCH_SSL_VERIFY'] || 'true'}"
+        ssl_version "#{ENV['FLUENT_ELASTICSEARCH_SSL_VERSION'] || 'TLSv1_2'}"
+        reload_connections 'false'
+        reconnect_on_error 'true'
+        reload_on_failure 'true'
+        log_es_400_reason 'true'
+        logstash_prefix 'proxy-tcp'
+        logstash_format 'true'
+        index_name 'proxy-tcp'
+        type_name 'fluentd'
+        <buffer>
+         flush_thread_count '8'
+         flush_interval '5s'
+         chunk_limit_size '2M'
+         queue_limit_length '32'
+         retry_max_interval '30'
+         retry_forever 'true'
+        </buffer>
+    </match>
+  efk-ufsm-sieweb-timer.conf: |
+    <source>
+      @type tail
+      @id ${ENV}-sieweb-timer-raw
+      path /var/log/containers/${ENV}-sieweb-timer*.log
+      pos_file /var/log/fluentd.${ENV}-sieweb-timer-raw.log.pos
+      tag ${ENV}-sieweb-timer-raw
+      path_key filename
+      read_from_head false
+      format /^(?<timestamp>[^\s]+) (?<stream>stdout|stderr) F (?<message>.*)$/
+    </source>
+
+    <filter ${ENV}-sieweb-timer-raw>
+      @type parser
+      key_name message
+      reserve_data true
+      remove_key_name_field false
+      <parse>
+        @type json
+      </parse>
+    </filter>
+
+    <filter ${ENV}-sieweb-timer-raw>
+      @type record_transformer
+      remove_keys timestamp
+    </filter>
+
+    <match ${ENV}-sieweb-timer-raw>
+      @type elasticsearch
+      @id out_es_${ENV}_sieweb-timer-raw
+      @log_level info
+      include_tag_key false
+      remove_keys stream,timestamp2,payara,_score,_type
+      host "#{ENV['FLUENT_ELASTICSEARCH_HOST']}"
+      port "#{ENV['FLUENT_ELASTICSEARCH_PORT']}"
+      path ''
+      user "#{ENV['FLUENT_ELASTICSEARCH_USER'] || ''}"
+      password "#{ENV['FLUENT_ELASTICSEARCH_PASSWORD'] || ''}"
+      scheme "#{ENV['FLUENT_ELASTICSEARCH_SCHEME'] || 'http'}"
+      ssl_verify "#{ENV['FLUENT_ELASTICSEARCH_SSL_VERIFY'] || 'true'}"
+      ssl_version "#{ENV['FLUENT_ELASTICSEARCH_SSL_VERSION'] || 'TLSv1_2'}"
+      reload_connections 'false'
+      reconnect_on_error 'true'
+      reload_on_failure 'true'
+      log_es_400_reason 'true'
+      logstash_prefix '${ENV}-sieweb-timer'
+      logstash_format 'true'
+      index_name '${ENV}-sieweb-timer'
+      type_name 'fluentd'
+      <buffer>
+        flush_thread_count '8'
+        flush_interval '5s'
+        chunk_limit_size '2M'
+        queue_limit_length '32'
+        retry_max_interval '30'
+        retry_forever 'true'
+      </buffer>
+    </match>
+  efk-ufsm-sieweb.conf: |
+    <source>
+      @type tail
+      @id ${ENV}-sieweb-raw
+      path /var/log/containers/${ENV}-sieweb-*_${ENV}-sieweb_sieweb-*.log
+      pos_file /var/log/fluentd.${ENV}-sieweb-raw.log.pos
+      tag ${ENV}-sieweb-raw
+      path_key filename
+      read_from_head false
+      format /^(?<timestamp>[^\s]+) (?<stream>stdout|stderr) F (?<message>.*)$/
+    </source>
+
+    <filter ${ENV}-sieweb-raw>
+      @type parser
+      key_name message
+      reserve_data true
+      remove_key_name_field false
+      <parse>
+        @type json
+      </parse>
+    </filter>
+
+    <filter ${ENV}-sieweb-raw>
+      @type record_transformer
+      remove_keys timestamp
+    </filter>
+
+    <match ${ENV}-sieweb-raw>
+      @type elasticsearch
+      @id out_es_${ENV}_sieweb-raw
+      @log_level info
+      include_tag_key false
+      remove_keys stream,timestamp2,payara,_score,_type
+      host "#{ENV['FLUENT_ELASTICSEARCH_HOST']}"
+      port "#{ENV['FLUENT_ELASTICSEARCH_PORT']}"
+      path ''
+      user "#{ENV['FLUENT_ELASTICSEARCH_USER'] || ''}"
+      password "#{ENV['FLUENT_ELASTICSEARCH_PASSWORD'] || ''}"
+      scheme "#{ENV['FLUENT_ELASTICSEARCH_SCHEME'] || 'http'}"
+      ssl_verify "#{ENV['FLUENT_ELASTICSEARCH_SSL_VERIFY'] || 'true'}"
+      ssl_version "#{ENV['FLUENT_ELASTICSEARCH_SSL_VERSION'] || 'TLSv1_2'}"
+      reload_connections 'false'
+      reconnect_on_error 'true'
+      reload_on_failure 'true'
+      log_es_400_reason 'true'
+      logstash_prefix '${ENV}-sieweb'
+      logstash_format 'true'
+      index_name '${ENV}-sieweb'
+      type_name 'fluentd'
+      <buffer>
+        flush_thread_count '8'
+        flush_interval '5s'
+        chunk_limit_size '2M'
+        queue_limit_length '32'
+        retry_max_interval '30'
+        retry_forever 'true'
+      </buffer>
+    </match>
+  fluent.conf: |+
+    <label @FLUENT_LOG>
+      <match fluent.**>
+      @type null
+      </match>
+    </label>
+    @include kubernetes.conf
+    @include efk-*.conf
+
+
+  kubernetes.conf: |+
+    <source>
+      @type tail
+      @id in_tail_docker
+      path /var/log/docker.log
+      pos_file /var/log/fluentd-docker.log.pos
+      tag kubernetes.docker
+      <parse>
+        @type regexp
+        expression /^time="(?<time>[^)]*)" level=(?<severity>[^ ]*) msg="(?<message>[^"]*)"( err="(?<error>[^"]*)")?( statusCode=($<status_code>\d+))?/
+      </parse>
+    </source>
+    <source>
+      @type tail
+      @id in_tail_etcd
+      path /var/log/etcd.log
+      pos_file /var/log/fluentd-etcd.log.pos
+      tag kubernetes.etcd
+      <parse>
+        @type none
+      </parse>
+    </source>
+    <source>
+      @type tail
+      @id in_tail_kubelet
+      multiline_flush_interval 5s
+      path /var/log/kubelet.log
+      pos_file /var/log/fluentd-kubelet.log.pos
+      tag kubernetes.kubelet
+      <parse>
+        @type kubernetes
+      </parse>
+    </source>
+    <source>
+      @type tail
+      @id in_tail_kube_proxy
+      multiline_flush_interval 5s
+      path /var/log/kube-proxy.log
+      pos_file /var/log/fluentd-kube-proxy.log.pos
+      tag kubernetes.kube-proxy
+      <parse>
+        @type kubernetes
+      </parse>
+    </source>
+    <source>
+      @type tail
+      @id in_tail_kube_apiserver
+      multiline_flush_interval 5s
+      path /var/log/kube-apiserver.log
+      pos_file /var/log/fluentd-kube-apiserver.log.pos
+      tag kubernetes.kube-apiserver
+      <parse>
+        @type kubernetes
+      </parse>
+    </source>
+    <source>
+      @type tail
+      @id in_tail_kube_controller_manager
+      multiline_flush_interval 5s
+      path /var/log/kube-controller-manager.log
+      pos_file /var/log/fluentd-kube-controller-manager.log.pos
+      tag kubernetes.kube-controller-manager
+      <parse>
+        @type kubernetes
+      </parse>
+    </source>
+    <source>
+      @type tail
+      @id in_tail_kube_scheduler
+      multiline_flush_interval 5s
+      path /var/log/kube-scheduler.log
+      pos_file /var/log/fluentd-kube-scheduler.log.pos
+      tag kubernetes.kube-scheduler
+      <parse>
+        @type kubernetes
+      </parse>
+    </source>
+    <source>
+      @type tail
+      @id in_tail_rescheduler
+      multiline_flush_interval 5s
+      path /var/log/rescheduler.log
+      pos_file /var/log/fluentd-rescheduler.log.pos
+      tag kubernetes.rescheduler
+      <parse>
+        @type kubernetes
+      </parse>
+    </source>
+    <source>
+      @type tail
+      @id in_tail_glbc
+      multiline_flush_interval 5s
+      path /var/log/glbc.log
+      pos_file /var/log/fluentd-glbc.log.pos
+      tag kubernetes.glbc
+      <parse>
+        @type kubernetes
+      </parse>
+    </source>
+    <source>
+      @type tail
+      @id in_tail_cluster_autoscaler
+      multiline_flush_interval 5s
+      path /var/log/cluster-autoscaler.log
+      pos_file /var/log/fluentd-cluster-autoscaler.log.pos
+      tag kubernetes.cluster-autoscaler
+      <parse>
+        @type kubernetes
+      </parse>
+    </source>
+    # Example:
+    # 2017-02-09T00:15:57.992775796Z AUDIT: id="90c73c7c-97d6-4b65-9461-f94606ff825f" ip="104.132.1.72" method="GET" user="kubecfg" as="<self>" asgroups="<lookup>" namespace="default" uri="/api/v1/namespaces/default/pods"
+    # 2017-02-09T00:15:57.993528822Z AUDIT: id="90c73c7c-97d6-4b65-9461-f94606ff825f" response="200"
+    <source>
+      @type tail
+      @id in_tail_kube_apiserver_audit
+      multiline_flush_interval 5s
+      path /var/log/kubernetes/kube-apiserver-audit.log
+      pos_file /var/log/kube-apiserver-audit.log.pos
+      tag kubernetes.kube-apiserver-audit
+      <parse>
+        @type multiline
+        format_firstline /^\S+\s+AUDIT:/
+        # Fields must be explicitly captured by name to be parsed into the record.
+        # Fields may not always be present, and order may change, so this just looks
+        # for a list of key="\"quoted\" value" pairs separated by spaces.
+        # Unknown fields are ignored.
+        # Note: We can't separate query/response lines as format1/format2 because
+        #       they don't always come one after the other for a given query.
+        format1 /^(?<time>\S+) AUDIT:(?: (?:id="(?<id>(?:[^"\\]|\\.)*)"|ip="(?<ip>(?:[^"\\]|\\.)*)"|method="(?<method>(?:[^"\\]|\\.)*)"|user="(?<user>(?:[^"\\]|\\.)*)"|groups="(?<groups>(?:[^"\\]|\\.)*)"|as="(?<as>(?:[^"\\]|\\.)*)"|asgroups="(?<asgroups>(?:[^"\\]|\\.)*)"|namespace="(?<namespace>(?:[^"\\]|\\.)*)"|uri="(?<uri>(?:[^"\\]|\\.)*)"|response="(?<response>(?:[^"\\]|\\.)*)"|\w+="(?:[^"\\]|\\.)*"))*/
+        time_format %Y-%m-%dT%T.%L%Z
+      </parse>
+    </source>
+    <filter kubernetes.**>
+      @type kubernetes_metadata
+      @id filter_kube_metadata
+    </filter>
+    <match kubernetes.**>
+        @type elasticsearch
+        @id out_es_kubernetes
+        @log_level info
+        include_tag_key true
+        host "#{ENV['FLUENT_ELASTICSEARCH_HOST']}"
+        port "#{ENV['FLUENT_ELASTICSEARCH_PORT']}"
+        path ''
+        user "#{ENV['FLUENT_ELASTICSEARCH_USER'] || ''}"
+        password "#{ENV['FLUENT_ELASTICSEARCH_PASSWORD'] || ''}"
+        scheme "#{ENV['FLUENT_ELASTICSEARCH_SCHEME'] || 'http'}"
+        ssl_verify "#{ENV['FLUENT_ELASTICSEARCH_SSL_VERIFY'] || 'true'}"
+        ssl_version "#{ENV['FLUENT_ELASTICSEARCH_SSL_VERSION'] || 'TLSv1_2'}"
+        reload_connections 'false'
+        reconnect_on_error 'true'
+        reload_on_failure 'true'
+        log_es_400_reason 'true'
+        logstash_prefix 'kubernetes'
+        logstash_format 'true'
+        index_name 'kubernetes'
+        type_name 'fluentd'
+        <buffer>
+         flush_thread_count '8'
+         flush_interval '5s'
+         chunk_limit_size '2M'
+         queue_limit_length '32'
+         retry_max_interval '30'
+         retry_forever 'true'
+        </buffer>
+    </match>
+
+kind: ConfigMap
+metadata:
+  name: fluentd-config-h4787c84f9
+  namespace: efk-logging
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: fluentd
+  name: fluentd
+  namespace: efk-logging
+spec:
+  selector:
+    matchLabels:
+      app: fluentd
+  template:
+    metadata:
+      labels:
+        app: fluentd
+    spec:
+      containers:
+      - env:
+        - name: K8S_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: FLUENT_ELASTICSEARCH_HOST
+          value: es-cluster-0.elasticsearch.efk-logging.svc.cluster.local
+        - name: FLUENT_ELASTICSEARCH_PORT
+          value: "9200"
+        - name: FLUENT_ELASTICSEARCH_SCHEME
+          value: https
+        - name: FLUENT_ELASTICSEARCH_SSL_VERIFY
+          value: "false"
+        - name: FLUENT_ELASTICSEARCH_SSL_VERSION
+          value: TLSv1_3
+        - name: FLUENT_ELASTICSEARCH_USER
+          value: elastic
+        - name: FLUENT_ELASTICSEARCH_PASSWORD
+          value: J#DEkUUxFOHNPOEQkMU9uZ0@2025
+        image: evertonagilar/fluentd:1.0.1
+        name: fluentd
+        resources:
+          limits:
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - mountPath: /var/log
+          name: varlog
+        - mountPath: /var/lib/docker/containers
+          name: varlibdockercontainers
+          readOnly: true
+        - mountPath: /fluentd/etc
+          name: config-path
+      initContainers:
+      - args:
+        - |
+          cp /fluentd/etc2/fluent.conf /fluentd/etc/fluent.conf
+          cp /fluentd/etc2/kubernetes.conf /fluentd/etc/kubernetes.conf
+          cp /fluentd/etc2/efk-k8s-loadbalancer.conf /fluentd/etc/efk-k8s-loadbalancer.conf
+          cp /fluentd/etc2/efk-ufsm-proxy-tcp.conf /fluentd/etc/efk-ufsm-proxy-tcp.conf
+          cp /fluentd/etc2/efk-ufsm-proxy-reverso.conf /fluentd/etc/efk-ufsm-proxy-reverso.conf
+          for i in dev replica prod; do
+              export ENV=$i
+              echo "Configurando fluentd do sieweb do ambiente $ENV"
+              envsubst < /fluentd/etc2/efk-ufsm-sieweb.conf > /fluentd/etc/efk-ufsm-$ENV-sieweb.conf
+              envsubst < /fluentd/etc2/efk-ufsm-sieweb-timer.conf > /fluentd/etc/efk-ufsm-$ENV-sieweb-timer.conf
+          done
+        command:
+        - /bin/sh
+        - -c
+        image: evertonagilar/alpine:1.0.0
+        imagePullPolicy: Always
+        name: config-fluentd
+        volumeMounts:
+        - mountPath: /fluentd/etc
+          name: config-path
+        - mountPath: /fluentd/etc2
+          name: config-source
+      serviceAccountName: fluentd
+      terminationGracePeriodSeconds: 7
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/control-plane
+      - effect: NoSchedule
+        key: ufsm.br.proxy-tcp
+        operator: Equal
+        value: "true"
+      - effect: NoSchedule
+        key: ufsm.br.proxy-reverso
+        operator: Equal
+        value: "true"
+      - effect: NoSchedule
+        key: ufsm.br.wportal-producao
+        operator: Equal
+        value: "true"
+      volumes:
+      - hostPath:
+          path: /var/log
+        name: varlog
+      - hostPath:
+          path: /var/lib/docker/containers
+        name: varlibdockercontainers
+      - configMap:
+          name: fluentd-config-h4787c84f9
+        name: config-source
+      - emptyDir: {}
+        name: config-path

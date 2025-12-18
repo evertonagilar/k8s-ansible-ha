@@ -1,0 +1,4 @@
+services:
+  fluentd:
+    image: evertonagilar/fluentd:1.0.1
+    build: .

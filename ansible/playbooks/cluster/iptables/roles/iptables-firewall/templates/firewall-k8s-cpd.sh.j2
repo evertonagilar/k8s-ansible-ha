@@ -1,0 +1,452 @@
+#!/bin/bash
+
+{# 
+# NÃO EDITAR!!! Provisionado com Ansible
+#
+# Se precisar adicionar regra, solicite no OTRS CPD:DevOps:Kubernetes
+#
+# Autor: Everton de Vargas Agilar <evertonagilar@ufsm.br>
+#
+# Objetivo: Firewall netfilter para os nodes do Kubernetes
+#
+# Portas do cluster para referência:
+#   6443: Kubernetes API server (control plane)
+#   2379-2380: etcd server client API (banco etcd)
+#   10250: Kubelet API (comunicação entre nodes)
+#   10257: kube-controller-manager (control plane)
+#   10259: kube-scheduler (control plane)
+#   10256: Kube-proxy
+#   30000-32767: NodePort (serviços expostos externamente)
+#   179: Calico networking (BGP)
+#   5473: Calico networking with Typha
+#   4789: Calico networking with VXLAN
+#   51820: Calico networking with IPv4 Wireguard
+#   51821: Calico networking with IPv6 Wireguard
+#   2049: Servidor NFS
+#   111: rpcbind NFS
+#   112: Keepalived VRRP (Virtual Router Redundancy Protocol)
+#
+#}
+
+######### Histórico de modificações ##############################################
+#
+# Data       |  Quem           |  Mensagem
+# ----------------------------------------------------------------------------------------------------------
+# 19/08/2024  Everton Agilar     Versão inicial
+# 23/09/2024  Everton Agilar     Suporte IPv6
+##################################################################################
+
+
+VERSAO_SCRIPT=1.0.1
+LOG_FILE='/etc/iptables/log-firewall.log'
+CURRENT_DATE=$(date '+%d/%m/%Y %H:%M:%S')
+CHAINS=()
+
+# -------------------------------------------------------------------------------------------------------
+
+# Função para escrever no arquivo de log
+function log(){
+    echo -e "$CURRENT_DATE: $1" | tee -a "$LOG_FILE"
+}
+
+# Função chamado via trap caso apresente problemas na execução do script
+function applyFallbackRulesAndExit() {
+    log "Aplicando regras de fallback após falha!!!"
+    setPolicyACCEPT
+    exit 1
+}
+
+# -------------------------------------------------------------------------------------------------------
+
+# Função para criar a chain. Também faz o flush se a chain já existe
+function newChain(){
+    local chain=$1
+    log "Criando chain $chain IPv4"
+    iptables -N $chain 2> /dev/null
+    log "Criando chain $chain IPv6"
+    ip6tables -N $chain 2> /dev/null
+    iptables -F $chain
+    ip6tables -F $chain
+}
+
+# -------------------------------------------------------------------------------------------------------
+
+# Função para criar uma chain se não existir passando como parâmetro o nome da chain
+function createChainSeNaoExiste() {
+    local newChain=$1
+    local existe='false'
+    for chain in "${CHAINS[@]}"; do
+        if [ "$chain" == "$newChain" ]; then
+            existe='true'
+            break
+        fi
+    done
+
+    if [ "$existe" == 'false' ]; then
+        log '-------------------------------------------------------------------------------------------'
+        log "Criando regras para o security group $newChain:"
+        CHAINS+=("$newChain")
+        newChain "$newChain"
+        jmpChain "$newChain" "INPUT,FORWARD"
+    fi
+}
+
+# -------------------------------------------------------------------------------------------------------
+
+# Função para definir a política para ACCEPT
+function setPolicyACCEPT(){
+    log "Definindo política ACCEPT IPv4"
+    iptables -P INPUT ACCEPT
+    iptables -P FORWARD ACCEPT
+    iptables -P OUTPUT ACCEPT
+
+    log "Definindo política ACCEPT IPv6"
+    ip6tables -P INPUT ACCEPT
+    ip6tables -P FORWARD ACCEPT
+    ip6tables -P OUTPUT ACCEPT
+}
+
+# -------------------------------------------------------------------------------------------------------
+
+# Função para definir a política padrão
+function setDefaultPolicy(){
+    log "Definindo política {{ IPTABLES.policy }} IPv4"
+    iptables -P INPUT {{ IPTABLES.policy }}
+    iptables -P FORWARD {{ IPTABLES.policy }}
+    iptables -P OUTPUT ACCEPT
+
+    log "Definindo política {{ IPTABLES.policy }} IPV6"
+    ip6tables -P INPUT {{ IPTABLES.policy }}
+    ip6tables -P FORWARD {{ IPTABLES.policy }}
+    ip6tables -P OUTPUT ACCEPT
+}
+
+# -------------------------------------------------------------------------------------------------------
+
+# Função para imprimir uma mensagem na tela e terminar o script
+function die () {
+    log "$1"
+    applyFallbackRulesAndExit
+}
+
+# -------------------------------------------------------------------------------------------------------
+
+# Função para executar criar uma regra de firewall mas sem duplicar se já existir
+function addRule(){
+    local exito='false'
+    local rule="$1"
+    local firewall="$2"
+    if [ -z "$firewall" ]; then
+        firewall="46"
+    fi
+    if [[ "$firewall" =~ 4 ]]; then
+        if ! /bin/sh -c "iptables -C $rule 2> /dev/null" ; then
+            /bin/sh -c "iptables -A $rule"
+            [ $? == 0 ] || die "Ocorreu um erro na regra IPv4: $rule"
+        fi
+    fi
+    if [[ "$firewall" =~ 6 ]]; then
+        if ! /bin/sh -c "ip6tables -C $rule 2> /dev/null" ; then
+            /bin/sh -c "ip6tables -A $rule"
+            [ $? == 0 ] || die "Ocorreu um erro na regra IPv6: $rule"
+        fi
+    fi
+}
+
+# -------------------------------------------------------------------------------------------------------
+
+# Função auxiliar para adicionar regra de firewall para IPv4
+function addRuleV4(){
+    addRule "$1" 4
+}
+
+# -------------------------------------------------------------------------------------------------------
+
+# Função auxiliar para adicionar regra de firewall para IPv6
+function addRuleV6(){
+    addRule "$1" 6
+}
+
+# -------------------------------------------------------------------------------------------------------
+
+# Função auxiliar para fazer o jump para a chain informada como parâmetro
+function jmpChain(){
+    local chain=$1
+    local onde=$2
+    if [[ "$onde" =~ INPUT ]] ; then
+        log "Aplicando chain $chain em INPUT"
+        addRule "INPUT -j $chain"
+    fi
+    if [[ "$onde" =~ FORWARD ]] ; then
+        log "Aplicando chain $chain em FORWARD"
+        addRule "FORWARD -j $chain"
+    fi
+}
+
+# -------------------------------------------------------------------------------------------------------
+
+# Função para permitir tráfego loopback
+function allowLoopback(){
+    log "Permitir tráfego loopback"
+    addRule "INPUT -i lo -j ACCEPT"
+    addRule "OUTPUT -o lo -j ACCEPT"
+    addRule "FORWARD -o lo -j ACCEPT"
+}
+
+
+# -------------------------------------------------------------------------------------------------------
+
+# Função para permitir tráfego relacionado e negar pacotes inválidos
+function allowRelateAndDenyInvalidPackages(){
+    log "Droppar pacotes INVALID "
+    addRule "INPUT -p tcp -m multiport --ports 80,22,2222 -m conntrack --ctstate INVALID -j DROP"
+    addRule "FORWARD -p tcp -m multiport --ports 80,22,2222 -m conntrack --ctstate INVALID -j DROP"
+
+    log "Permitir tráfego ESTABLISHED,RELATED"
+    addRule "INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT"
+    addRule "FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT"
+}
+
+# -------------------------------------------------------------------------------------------------------
+
+# Função para remover as chains atuais deste firewall (tudo que começa com CPD_)
+function removeCurrentChains(){
+    for delChain in $(iptables -S | grep -E '^-A CPD_' | awk '{print $2}' | uniq); do
+        log "Removendo chain atual $delChain"
+        iptables -D INPUT -j $delChain 2> /dev/null
+        ip6tables -D INPUT -j $delChain 2> /dev/null
+        iptables -D FORWARD -j $delChain 2> /dev/null
+        ip6tables -D FORWARD -j $delChain 2> /dev/null
+        iptables -F $delChain 2> /dev/null
+        ip6tables -F $delChain 2> /dev/null
+        iptables -X $delChain 2> /dev/null
+        ip6tables -X $delChain 2> /dev/null
+    done
+
+    # Remover regras
+    iptables -D INPUT -j LOG --log-prefix "PACOTE DROPADO" 2> /dev/null
+    iptables -D INPUT -m conntrack --ctstate INVALID -j DROP 2> /dev/null
+    iptables -D FORWARD -m conntrack --ctstate INVALID -j DROP 2> /dev/null
+}
+
+# -------------------------------------------------------------------------------------------------------
+
+# Função para negar serviços em portas específicas na chain CPD_K8S_SEC
+function denyServices(){
+    createChainSeNaoExiste "CPD_K8S_SEC"
+
+    log "Bloquear portas TCP conhecidas contra scans: {{ IPTABLES.deny.tcp.ports }}"
+    addRule "CPD_K8S_SEC -p tcp -m tcp -m multiport --dports {{ IPTABLES.deny.tcp.ports }} -j DROP"
+
+    log "Bloquear portas UDP conhecidas contra scans: {{ IPTABLES.deny.udp.ports }}"
+    addRule "CPD_K8S_SEC -p udp -m udp -m multiport --dports {{ IPTABLES.deny.udp.ports }} -j DROP"
+
+    iptables -A CPD_K8S_SEC -j RETURN
+}
+
+# -------------------------------------------------------------------------------------------------------
+
+# Função para permitir serviços
+function allowServices(){
+{% for serviceName, service in IPTABLES.accept.items() %}
+    {% set chain="CPD_K8S_" + serviceName|upper %}
+    {% set chainUtilizada = false %}
+
+    {% if service.from.mac_src is defined %}
+        {% set srcList = service.from.ip_src + service.from.mac_src %}
+    {% else %}
+        {% set srcList = service.from.ip_src %}
+    {% endif %}
+
+    {% for src in srcList %}
+        {% if (src.nodes == "all")
+            or ("all" in src.nodes)
+            or ("virtualip" in src.nodes)
+            or ("nfs" in src.nodes and "nfs" in group_names)
+            or ("proxy" in src.nodes and "proxy" in group_names)
+            or ("controlplane" in src.nodes and "controlplane" in group_names )
+            or ("worker" in src.nodes and "worker" in group_names)
+            or (ansible_host in src.nodes) %}
+
+            {# Parâmetros do tipo de IP #}
+            {% if src.ip is defined %}
+                {% if ':' in src.ip %}
+                    {% set IP_V = "V6" %}
+                    {% set ICMP_PROTO_V = "v6" %}
+                    {% set ICMP_MODULE_V = "6" %}
+                {% else %}
+                    {% set IP_V = "V4" %}
+                    {% set ICMP_PROTO_V = "" %}
+                    {% set ICMP_MODULE_V = "" %}
+                {% endif %}
+            {% else %}
+                {% set IP_V = "V4" %}
+                {% set ICMP_PROTO_V = "" %}
+                {% set ICMP_MODULE_V = "" %}
+            {% endif %}
+
+
+            {% set auditPrefixOption = "AUDIT_" + serviceName | upper %}
+
+            {# define o parâmetro porta de destino #}
+            {%  if service.port is defined %}
+                {% set isMultiPortOption = "," in service.port|string %}
+                {% if isMultiPortOption %}
+                    {% set portOption = "-m multiport --dports " +  service.port|string %}
+                    {% set portLogOption = "ports " + service.port|string %}
+                {% else %}
+                    {% set portOption = "--dport "+ service.port|string %}
+                    {% set portLogOption = "port "+ service.port|string %}
+                {%  endif %}
+            {% else %}
+                {% set portOption = "" %}
+                {% set portLogOption = "" %}
+            {% endif %}
+
+
+            {# define o parâmetro ip de origem #}
+            {%  if src.ip is defined %}
+                {% set srcValueType = "ip" %}
+                {% if "controlplane" in src.ip %}
+                    {% set srcValues = groups["controlplane"] | map('extract', hostvars, 'ansible_host') | list %}
+                {% elif "worker" in src.ip %}
+                    {% set srcValues = groups["worker"] | map('extract', hostvars, 'ansible_host') | list %}
+                {% elif "virtualip" in src.ip %}
+                    {% set srcValues = [VM_VIRTUAL_IP] %}
+                {% elif "nfs" in src.ip %}
+                    {% set srcValues = groups["nfs"] | map('extract', hostvars, 'ansible_host') | list %}
+                {% elif "node" in src.ip or "all" in src.ip %}
+                    {% set srcValues = groups["all"] | map('extract', hostvars, 'ansible_host') | list %}
+                {% else %}
+                    {% set srcValues = [src.ip] %}
+                {% endif %}
+            {% else %}
+                {% set srcValueType = "mac" %}
+                {% set srcValues = [src.addr] %}
+            {% endif %}
+
+            {% for srcValue in srcValues %}
+                {%  if srcValueType == "ip" %}
+                    {% set srcOption = "-s " + srcValue %}
+                    {% set srcLogOption = "src_ip " + srcValue %}
+                {% else %}
+                    {% set srcOption = "-m mac --mac-source "+ srcValue %}
+                    {% set srcLogOption = "mac addr "+ srcValue %}
+                {% endif %}
+
+                {% for proto in ["tcp", "udp", "icmp", "vrrp"] %}
+                    {% if service.protocol|lower == proto or (service.protocol|lower == "all" and proto in ["tcp", "udp"]) %}
+                        {% if service.protocol|lower == "icmp" %}
+                            {% if ':' in src.ip %}
+                                {% set protoOption = "-p icmp" + ICMP_PROTO_V + " -m icmp"+ ICMP_PROTO_V + " --icmp" + ICMP_PROTO_V + "-type 128" %}
+                                {% set protoOption2 = "-p icmp" + ICMP_PROTO_V + " -m icmp"+ ICMP_PROTO_V + " --icmp" + ICMP_PROTO_V + "-type 135" %}
+                                {% set protoOption3 = "-p icmp" + ICMP_PROTO_V + " -m icmp"+ ICMP_PROTO_V + " --icmp" + ICMP_PROTO_V + "-type 136" %}
+                            {% else %}
+                                {% set protoOption = "-p icmp" + ICMP_PROTO_V + " -m icmp"+ ICMP_PROTO_V + " --icmp" + ICMP_PROTO_V + "-type 8" %}
+                            {% endif %}
+                        {% else %}
+                            {% set protoOption = "-p " + proto %}
+                        {% endif %}
+
+                        {% if not chainUtilizada %}
+                            createChainSeNaoExiste {{ chain }}
+                            {% set chainUtilizada = true %}
+                        {% endif %}
+
+                        {% if src.audit is defined and src.audit %}
+                          log "Auditar IP{{ IP_V }} proto {{ service.protocol }} {{ portLogOption }} {{ srcLogOption }} - {{ src.comment }}"
+                          addRule{{ IP_V }} "{{ chain }} {{ protoOption }} {{ srcOption }} {{ portOption }} -m comment --comment 'Audit {{ service.protocol }} {{ src.comment }}' -j LOG --log-prefix ' {{ auditPrefixOption }}'"
+                        {%  endif %}
+
+                        {% if src.rateLimit is defined and src.rateLimit.enable %}
+                          log "Rate limit IP{{ IP_V }} proto {{ service.protocol }} {{ portLogOption }} {{ srcLogOption }} - {{ src.comment }}"
+                          addRule{{ IP_V }} "{{ chain }} {{ protoOption }} {{ srcOption }} {{ portOption }} -m hashlimit --hashlimit-name {{ serviceName }}_tcp_rate_limit --hashlimit-above {{ src.rateLimit.limitAbove }} --hashlimit-mode srcip --hashlimit-burst {{ src.rateLimit.limitBurst }} -m comment --comment 'rateLimit {{ service.protocol }} {{ src.comment }}' -j DROP"
+                        {%  endif %}
+
+                        {% if src.connLimit is defined and src.connLimit.enable %}
+                          log "Connection limit IP{{ IP_V }} proto {{ service.protocol }} {{ portLogOption }} {{ srcLogOption }} - {{ src.comment }}"
+                          addRule{{ IP_V }} "{{ chain }} {{ protoOption }} {{ srcOption }} {{ portOption }} -m connlimit --connlimit-above {{ src.connLimit.limit }} -m comment --comment 'connLimit {{ service.protocol }} {{ src.comment }}' -j DROP"
+                        {%  endif %}
+
+                        {% if src.ip is defined %}
+                        {% if ':' in src.ip %}
+                          log "Permitir IP{{ IP_V }} proto {{ service.protocol }} {{ portLogOption }} {{ srcLogOption }} - {{ src.comment }}"
+                          addRule{{ IP_V }} "{{ chain }} {{ protoOption }} {{ srcOption }} {{ portOption }} -m comment --comment 'Allow {{ service.protocol }} {{ src.comment }}' -j ACCEPT"
+                          {% if service.protocol|lower == "icmp" %}
+                            addRule{{ IP_V }} "{{ chain }} {{ protoOption2 }} {{ srcOption }} {{ portOption }} -m comment --comment 'Allow {{ service.protocol }} {{ src.comment }}' -j ACCEPT"
+                            addRule{{ IP_V }} "{{ chain }} {{ protoOption3 }} {{ srcOption }} {{ portOption }} -m comment --comment 'Allow {{ service.protocol }} {{ src.comment }}' -j ACCEPT"
+                          {%  endif %}
+                        {% else %}
+                          log "Permitir IP{{ IP_V }} proto {{ service.protocol }} {{ portLogOption }} {{ srcLogOption }} - {{ src.comment }}"
+                          addRule{{ IP_V }} "{{ chain }} {{ protoOption }} {{ srcOption }} {{ portOption }} -m comment --comment 'Allow {{ service.protocol }} {{ src.comment }}' -j ACCEPT"
+                        {%  endif %}
+                        {%  endif %}
+                    {%  endif %}
+                {% endfor %}
+            {% endfor %}
+
+        {%  endif %}
+    {%  endfor %}
+
+    {% if chainUtilizada %}
+        iptables -A {{ chain }} -j RETURN
+    {% endif %}
+{%  endfor %}
+log '-------------------------------------------------------------------------------------------'
+}
+
+
+# -------------------------------------------------------------------------------------------------------
+
+# Função para iniciar o firewall
+function startFirewall(){
+    log '\n# ****************************************** START ******************************************'
+    log "Iniciando firewall versão: $VERSAO_SCRIPT"
+    setPolicyACCEPT
+    removeCurrentChains
+    allowLoopback
+    allowRelateAndDenyInvalidPackages
+    allowServices
+    denyServices
+    setDefaultPolicy
+    log '# ****************************************** END ******************************************'
+}
+
+# -------------------------------------------------------------------------------------------------------
+
+# Função para parar o firewall
+function stopFirewall(){
+    log '\n# ****************************************** START ******************************************'
+    log "Parando firewall versão: $VERSAO_SCRIPT"
+    setPolicyACCEPT
+    allowLoopback
+    removeCurrentChains
+    log '# ****************************************** END ******************************************'
+}
+
+# -------------------------------------------------------------------------------------------------------
+
+# Definir um trap para capturar erros e aplicar regras de fallback
+trap applyFallbackRulesAndExit ERR
+
+# Case utilizado pelo systemd para iniciar, parar ou reiniciar o firewall
+case "$1" in
+    start)
+        stopFirewall
+        startFirewall
+        ;;
+    stop)
+        stopFirewall
+        ;;
+    restart)
+        stopFirewall
+        startFirewall
+        ;;
+    *)
+        echo "Uso: $0 {start|stop|restart}"
+        exit 1
+        ;;
+esac
+
+exit 0
+

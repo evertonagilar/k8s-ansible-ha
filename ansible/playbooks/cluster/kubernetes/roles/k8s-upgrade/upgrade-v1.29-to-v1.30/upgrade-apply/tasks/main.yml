@@ -1,0 +1,5 @@
+---
+- name: Fazer upgrade do controlplane
+  shell: kubeadm upgrade apply v1.30.2
+  args:
+    executable: /bin/bash

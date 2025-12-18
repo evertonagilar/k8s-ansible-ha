@@ -1,0 +1,55 @@
+---
+- name: Adicionar repositório ingress-nginx
+  kubernetes.core.helm_repository:
+    name: ingress-nginx
+    repo_url: https://kubernetes.github.io/ingress-nginx
+
+- name: Instalar o ingress-nginx no Kubernetes
+  kubernetes.core.helm:
+    name: ingress-nginx
+    chart_ref: ingress-nginx/ingress-nginx
+    release_namespace: ingress-nginx
+    create_namespace: true
+    values:
+      controller:
+        tolerations:
+          - key: "node-role.kubernetes.io/control-plane"
+            operator: "Exists"
+            effect: "NoSchedule"
+
+- name: Obter a porta nodePort do Ingress Controller atual
+  kubernetes.core.k8s_info:
+    kind: Service
+    api_version: v1
+    namespace: ingress-nginx
+    name: ingress-nginx-controller
+  register: ingress_service
+
+- name: Ajustar porta nodePort para 31779
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: ingress-nginx-controller
+        namespace: ingress-nginx
+      spec:
+        type: NodePort
+        ports:
+          - port: 80
+            targetPort: 80
+            protocol: TCP
+            nodePort: 31779
+            name: http
+          - port: 443
+            targetPort: 443
+            protocol: TCP
+            name: https
+  when: ingress_service.resources[0].spec.ports[0].nodePort != 31779
+
+- name: Configurar o configmap do Ingress Controller
+  kubernetes.core.k8s:
+    template: ingress-nginx-controller-cm.yaml
+    state: present
+

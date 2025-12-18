@@ -1,0 +1,9 @@
+---
+- name: Verificar se metrics-server está instalado
+  command: kubectl -n kube-system get pod -l k8s-app=metrics-server
+  register: metrics_server
+
+- name: Instalar o metric server
+  shell: curl -sL https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.6.3/components.yaml | sed '/- --secure-port=4443/a\        - --kubelet-insecure-tls' | kubectl apply -f -
+  when: metrics_server.stdout == ""
+

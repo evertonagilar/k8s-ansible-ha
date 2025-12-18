@@ -1,0 +1,97 @@
+---
+- name: Stat da pasta /etc/kubernetes/admin.conf
+  stat:
+    path: /etc/kubernetes/admin.conf
+  register: admin_conf
+
+# ********** root *********
+
+- name: Criar a pasta /root/.kube
+  file:
+    path: /root/.kube
+    state: directory
+    mode: 0700
+    owner: root
+    group: root
+  when: admin_conf.stat.exists
+
+- name: Verifica se o arquivo /root/.kube/config já existe
+  stat:
+    path: /root/.kube/config
+  register: kube_root_config
+
+- name: Copiar o arquivo /etc/kubernetes/admin.conf para /root/.kube/config
+  copy:
+    dest: /root/.kube/config
+    src: /etc/kubernetes/admin.conf
+    remote_src: yes
+    mode: 0700
+    owner: root
+    group: root
+  when: admin_conf.stat.exists and not kube_root_config.stat.exists
+
+
+# ********** Ubuntu *********
+
+- name: Stat da pasta /home/ubuntu
+  stat:
+    path: /home/ubuntu
+  register: dir_home_ubuntu
+
+- name: Criar a pasta /home/ubuntu/.kube
+  file:
+    path: /home/ubuntu/.kube
+    state: directory
+    mode: 0700
+    owner: ubuntu
+    group: ubuntu
+  when: admin_conf.stat.exists and dir_home_ubuntu.stat.exists
+
+- name: Verifica se o arquivo /home/ubuntu/.kube/config já existe
+  stat:
+    path: /home/ubuntu/.kube/config
+  register: kube_ubuntu_config
+
+- name: Copiar o arquivo /etc/kubernetes/admin.conf para /home/ubuntu/.kube/config
+  copy:
+    dest: /home/ubuntu/.kube/config
+    src: /etc/kubernetes/admin.conf
+    remote_src: yes
+    mode: 0700
+    owner: ubuntu
+    group: ubuntu
+    backup: true
+  when: admin_conf.stat.exists and dir_home_ubuntu.stat.exists and not kube_ubuntu_config.stat.exists
+
+# Vagrant
+
+- name: Stat da pasta /home/vagrant
+  stat:
+    path: /home/vagrant
+  register: dir_vagrant
+
+- name: Criar a pasta /home/vagrant/.kube
+  file:
+    path: /home/vagrant/.kube
+    state: directory
+    mode: 0700
+    owner: vagrant
+    group: vagrant
+  when: admin_conf.stat.exists and dir_vagrant.stat.exists
+
+- name: Verifica se o arquivo /home/vagrant/.kube/config já existe
+  stat:
+    path: /home/vagrant/.kube/config
+  register: kube_vagrant_config
+
+- name: Copiar o arquivo /etc/kubernetes/admin.conf para /home/vagrant/.kube/config
+  copy:
+    dest: /home/vagrant/.kube/config
+    src: /etc/kubernetes/admin.conf
+    remote_src: yes
+    mode: 0700
+    owner: vagrant
+    group: vagrant
+  when: admin_conf.stat.exists and dir_vagrant.stat.exists and not kube_vagrant_config.stat.exists
+
+

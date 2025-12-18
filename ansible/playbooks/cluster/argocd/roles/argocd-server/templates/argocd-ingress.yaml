@@ -1,0 +1,33 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-ingress
+  namespace: argocd
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: HTTPS
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/whitelist-source-range: "{{ ARGOCD.ingress.whitelist }}"
+    nginx.ingress.kubernetes.io/limit-connections: "{{ ARGOCD.ingress.limitConnections }}"
+    cert-manager.io/cluster-issuer: "{{ ARGOCD.ingress.clusterIssuer }}"
+  labels:
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/part-of: argocd
+    app.kubernetes.io/version: 1.0.0
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - "{{ ARGOCD.ingress.host }}"
+      secretName: "{{ ARGOCD.ingress.secretName }}"
+  rules:
+    - host: "{{ ARGOCD.ingress.host }}"
+      http:
+        paths:
+          - backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 443
+            path: /
+            pathType: Prefix

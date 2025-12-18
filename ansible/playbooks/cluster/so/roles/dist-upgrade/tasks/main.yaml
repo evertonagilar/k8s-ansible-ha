@@ -1,0 +1,9 @@
+---
+- name: Atualizar lista de pacotes
+  apt:
+    update_cache: yes
+
+- name: Fazer dist-upgrade
+  apt:
+    upgrade: dist
+    force_apt_get: yes

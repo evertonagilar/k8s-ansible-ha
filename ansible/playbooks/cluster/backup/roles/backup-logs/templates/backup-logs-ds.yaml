@@ -1,0 +1,78 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: k8slogbck-agent
+  namespace: backup-jobs
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: k8slogbck-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: k8slogbck-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: k8slogbck-role
+subjects:
+- kind: ServiceAccount
+  name: k8slogbck-agent
+  namespace: backup-jobs
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: k8slogbck-agent
+  namespace: backup-jobs
+spec:
+  selector:
+    matchLabels:
+      app: k8slogbck-agent
+  template:
+    metadata:
+      labels:
+        app: k8slogbck-agent
+    spec:
+      serviceAccountName: k8slogbck-agent
+      containers:
+      - name: k8slogbck-agent
+        image: evertonagilar/k8slogbck:1.0.0
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: BACKUP_PATTERN
+          value: "{{ KUBELET.backup_pattern }}"
+        - name: REMOVE_AFTER_COPY
+          value: "{{ KUBELET.backup_remove_after_copy }}"
+        volumeMounts:
+        - mountPath: /var/log/pods
+          name: log-path
+        - mountPath: /backup
+          name: backup-dest
+        resources:
+          requests:
+            memory: "50Mi"
+            cpu: "0.1"
+          limits:
+            memory: "70Mi"
+            cpu: "0.3"
+      volumes:
+      - hostPath:
+          path: /var/log/pods
+          type: Directory
+        name: log-path
+      - hostPath:
+          path: "{{ KUBELET.backup_log_path }}"
+          type: DirectoryOrCreate
+        name: backup-dest

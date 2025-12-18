@@ -1,0 +1,13 @@
+---
+- name: Variáveis utilizadas para provisionar StorageClass
+  debug:
+    msg:
+      - "ansible_host = {{ ansible_host }}"
+      - "VOLUME_NFS = {{ VOLUME_NFS }}"
+
+- name: Provisionar StorageClass NFS para volume de logs
+  kubernetes.core.k8s:
+    state: present
+    template: storage-class.yaml
+
+

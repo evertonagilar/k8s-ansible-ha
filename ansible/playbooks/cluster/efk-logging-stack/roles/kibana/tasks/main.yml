@@ -1,0 +1,69 @@
+---
+- name: Variáveis utilizadas para provisionar kibana
+  debug:
+    msg:
+      - "ansible_host = {{ ansible_host }}"
+      - "ansible_hostname = {{ ansible_hostname }}"
+      - "EFK_LOGGING.kibana.ingress.clusterIssuer = {{ EFK_LOGGING.kibana.ingress.clusterIssuer }}"
+      - "EFK_LOGGING.kibana.ingress.secretName = {{ EFK_LOGGING.kibana.ingress.secretName }}"
+      - "EFK_LOGGING.kibana.ingress.host = {{ EFK_LOGGING.kibana.ingress.host }}"
+      - "EFK_LOGGING.kibana.ingress.whitelist = {{ EFK_LOGGING.kibana.ingress.whitelist }}"
+      - "EFK_LOGGING.kibana.ingress.limitConnections = {{ EFK_LOGGING.kibana.ingress.limitConnections }}"
+
+- name: Criar namespace efk-logging
+  kubernetes.core.k8s:
+    name: efk-logging
+    api_version: v1
+    kind: Namespace
+    state: present
+  tags:
+    - kibana-namespace
+
+- name: Provisionar kibana config
+  kubernetes.core.k8s:
+    template: kibana-config.yaml
+    state: present
+    wait: yes
+    force: yes
+  tags:
+    - kibana-config
+
+- name: Provisionar kibana volume
+  kubernetes.core.k8s:
+    template: kibana-volume.yaml
+    state: present
+    wait: yes
+  tags:
+    - kibana-volume
+
+- name: Provisionar kibana deployment
+  kubernetes.core.k8s:
+    template: kibana-deployment.yaml
+    state: present
+    wait: yes
+    wait_timeout: 600
+    wait_sleep: 30
+  tags:
+    - kibana-deployment
+
+- name: Provisionar kibana service
+  kubernetes.core.k8s:
+    template: kibana-svc.yaml
+    state: present
+    wait: yes
+  tags:
+    - kibana-svc
+
+- name: Provisionar kibana ingress
+  kubernetes.core.k8s:
+    template: kibana-ingress.yaml
+    state: present
+  tags:
+    - kibana-ingress
+
+- name: Provisionar kibana network policy
+  kubernetes.core.k8s:
+    template: kibana-netpol.yaml
+    state: present
+  tags:
+    - kibana-netpol

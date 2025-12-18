@@ -1,0 +1,80 @@
+---
+- name: Configurar etc/hosts
+  hosts: controlplane worker
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - etc-hosts-config
+  tags:
+    - hosts
+
+- name: Configurar timezone
+  hosts: controlplane worker
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - locale-timezone
+  tags:
+    - timezone
+
+- name: Desabilitar swap
+  hosts: controlplane worker
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - disable-swap
+  tags:
+    - swap
+
+- name: Instalar pacotes essenciais
+  hosts: controlplane worker
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - pacotes-essenciais
+  tags:
+    - pacotes-essenciais
+
+- name: Instalar serviço NTP
+  hosts: controlplane worker
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - chrony
+  tags:
+    - chrony
+
+- name: Configurar vim para Kubernetes
+  hosts: controlplane worker
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - vim-config
+  tags:
+    - vim-config
+
+- name: Configurar parâmetros do Kernel
+  hosts: controlplane worker
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - sysctl-config
+  tags:
+    - sysctl-config
+
+- name: Desabilitar o Transparent Huge Pages (THP)
+  hosts: controlplane worker
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - disable-thp
+  tags:
+    - disable-thp

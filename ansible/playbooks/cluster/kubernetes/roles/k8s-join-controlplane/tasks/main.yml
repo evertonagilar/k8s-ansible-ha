@@ -1,0 +1,39 @@
+---
+- name: Variáveis utilizadas para join do novo controlplane {{ ansible_host }}
+  debug:
+    msg:
+      - "ansible_host = {{ ansible_host }}"
+      - "ansible_hostname = {{ ansible_hostname }}"
+      - "VM_CONTROL_PLANE_ENDPOINT = {{ VM_CONTROL_PLANE_ENDPOINT }}"
+      - "VM_POD_NETWORK_CIDR = {{ VM_POD_NETWORK_CIDR }}"
+      - "VM_SERVICE_CIDR = {{ VM_SERVICE_CIDR }}"
+      - "VM_VIRTUAL_IP = {{ VM_VIRTUAL_IP }}"
+      - "join_command = {{ hostvars[groups['controlplane_init'][0]].join_command }}"
+      - "join_token = {{ hostvars[groups['controlplane_init'][0]].join_token }}"
+
+- name: Verificando se o controlplane já está provisionado
+  stat:
+    path: /etc/kubernetes/manifests/kube-apiserver.yaml
+  register: cluster_stat
+
+- name: Adicionar o novo controlplane
+  shell: |
+    {{ hostvars[groups['controlplane_init'][0]].join_command }} \
+    --apiserver-advertise-address={{ ansible_host }} \
+    --node-name {{ ansible_hostname }} \
+    --cri-socket unix:///run/containerd/containerd.sock \
+    --control-plane \
+    --certificate-key {{ hostvars[groups['controlplane_init'][0]].join_token }}
+  args:
+    executable: /bin/bash
+  when: not cluster_stat.stat.exists
+
+- name: Aguardar todos os control-plane ficarem prontos
+  shell: |
+    kubectl --kubeconfig=/etc/kubernetes/admin.conf wait node \
+      --for=condition=Ready \
+      -l node-role.kubernetes.io/control-plane \
+      --timeout=300s
+  args:
+    executable: /bin/bash
+  when: not cluster_stat.stat.exists    

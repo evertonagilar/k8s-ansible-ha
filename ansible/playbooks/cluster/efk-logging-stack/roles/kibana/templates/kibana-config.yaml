@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kibana-config
+  namespace: efk-logging
+data:
+  kibana.yml: |
+    server.host: 0.0.0.0
+    server.shutdownTimeout: 5s
+    server.publicBaseUrl: https://kibana.k8s.si.ufsm.br
+    elasticsearch.hosts: ['https://10.244.30.159:9200']
+    monitoring.ui.container.elasticsearch.enabled: true
+    elasticsearch.serviceAccountToken: AAEAAWVsYXN0aWMva2liYW5hL2Vucm9sbC1wcm9jZXNzLXRva2VuLTE3MzIwNTQzMTMyNjA6S2RmNTVvX0pSSy1Ud3NzSGlNNkdkZw
+    elasticsearch.ssl.certificateAuthorities: [/usr/share/kibana/data/ca_1732054314128.crt]
+    xpack.fleet.outputs: [{id: fleet-default-output, name: default, is_default: true, is_default_monitoring: true, type: elasticsearch, hosts: ['https://10.244.30.159:9200'], ca_trusted_fingerprint: abde11e620d1c13d8a4b6b20cfa0287c99de81842c48f058555adabc8300e42b}]

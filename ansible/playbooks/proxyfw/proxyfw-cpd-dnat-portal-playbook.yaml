@@ -1,0 +1,5 @@
+- name: Provisionar cpd-dnat-portal
+  hosts: proxyfw
+  become: yes
+  roles:
+    - dnat-portal

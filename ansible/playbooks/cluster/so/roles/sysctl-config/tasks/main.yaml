@@ -1,0 +1,11 @@
+---
+- name: Instalar /etc/sysctl.d/99-k8s.conf
+  copy:
+    src: sysctl.conf
+    dest: /etc/sysctl.d/99-k8s.conf
+    mode: 0644
+  register: sysctl_config
+
+- name: Aplicar parâmetros do sysctl
+  command: "sysctl --system"
+  when: sysctl_config.changed

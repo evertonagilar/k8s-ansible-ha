@@ -1,0 +1,3 @@
+NAMESPACE: prod-sieweb-redis
+NOME_APP: prod-sieweb-redis
+OVERLAY_PATH: overlays/prod

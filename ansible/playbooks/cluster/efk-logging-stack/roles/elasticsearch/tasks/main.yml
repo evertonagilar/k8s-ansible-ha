@@ -1,0 +1,50 @@
+---
+- name: Variáveis utilizadas para provisionar elasticsearch
+  debug:
+    msg:
+      - "ansible_host = {{ ansible_host }}"
+      - "ansible_hostname = {{ ansible_hostname }}"
+      - "EFK_LOGGING.elasticsearch.nodeName = {{ EFK_LOGGING.elasticsearch.nodeName }}"
+      - "EFK_LOGGING.elasticsearch.volumePath = {{ EFK_LOGGING.elasticsearch.volumePath }}"
+
+- name: Criar namespace efk-logging
+  kubernetes.core.k8s:
+    name: efk-logging
+    api_version: v1
+    kind: Namespace
+    state: present
+  tags:
+    - elasticsearch-namespace
+
+- name: Provisionar elasticsearch service
+  kubernetes.core.k8s:
+    template: elasticsearch-svc.yaml
+    state: present
+    wait: yes
+  tags:
+    - elasticsearch-svc
+
+- name: Provisionar persistent volume
+  kubernetes.core.k8s:
+    template: elasticsearch-volume.yaml
+    state: present
+    wait: yes
+  tags:
+    - elasticsearch-volume
+
+- name: Provisionar elasticsearch statefulset
+  kubernetes.core.k8s:
+    template: elasticsearch-statefulset.yaml
+    state: present
+    wait: yes
+    wait_timeout: 600
+    wait_sleep: 30
+  tags:
+    - elasticsearch-sts
+
+- name: Provisionar elasticsearch network policy
+  kubernetes.core.k8s:
+    template: elasticsearch-netpol.yaml
+    state: present
+  tags:
+    - elasticsearch-netpol

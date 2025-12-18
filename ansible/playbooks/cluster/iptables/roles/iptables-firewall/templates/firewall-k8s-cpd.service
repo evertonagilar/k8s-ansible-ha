@@ -1,0 +1,13 @@
+[Unit]
+Description=Inicia o firewall iptables
+After=network.target
+Wants=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/etc/iptables/firewall-k8s-cpd.sh start
+ExecStop=/etc/iptables/firewall-k8s-cpd.sh stop
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target

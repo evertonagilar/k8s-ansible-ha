@@ -1,0 +1,13 @@
+---
+- name: Instalação comum do Kubernetes ( kubeadm, kubectl, kubelet )
+  hosts: controlplane worker
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - k8s-software
+    - kubelet
+  tags:
+    - k8s-common
+    - kubelet
+
