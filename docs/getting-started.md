@@ -55,13 +55,13 @@ ansible --version
 | `vm-controlplane-01` | 2 GB | 2 | 100 GB |
 | `vm-controlplane-02` | 2 GB | 2 | 100 GB |
 | `vm-controlplane-03` | 2 GB | 2 | 100 GB |
-| `vm-worker-01` | 14 GB | 2 | 100 GB |
-| `vm-worker-02` | 8 GB | 2 | 100 GB |
+| `vm-worker-01` | 2 GB | 2 | 100 GB |
+| `vm-worker-02` | 2 GB | 2 | 100 GB |
 | `vm-worker-03` | 2 GB | 2 | 100 GB |
-| **Total** | **~31 GB** | **13** | **~620 GB** |
+| **Total** | **~13 GB** | **13** | **~620 GB** |
 
-> **Dica:** Para economizar recursos, edite `VM_WORKER_MEMORY` no `cluster/Vagrantfile`
-> reduzindo memória dos workers. Mínimo recomendado por worker: `2048` (2 GB).
+> **Dica:** Para aumentar a capacidade dos workers, edite `VM_WORKER_MEMORY` no `cluster/Vagrantfile`.
+> O valor atual é `2048` (2 GB) por worker.
 
 ---
 
