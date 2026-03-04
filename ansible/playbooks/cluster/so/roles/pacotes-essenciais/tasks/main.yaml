@@ -5,6 +5,10 @@
     state: directory
     mode: 755
 
+- name: Atualizar lista de pacotes apt
+  apt:
+    update_cache: yes
+
 - name: Instalação de pacotes essenciais no SO
   apt:
     name: "{{ item }}"

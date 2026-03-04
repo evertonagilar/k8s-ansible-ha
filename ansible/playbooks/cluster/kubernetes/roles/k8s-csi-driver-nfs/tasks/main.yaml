@@ -18,6 +18,6 @@
     values: {}
 
 - name: Aguardar csi-driver-nfs ficar pronto
-  shell: kubectl --kubeconfig=/etc/kubernetes/admin.conf wait --timeout=-1s --for=condition=Ready deploy metrics-server -n kube-system
+  shell: kubectl --kubeconfig=/etc/kubernetes/admin.conf wait -n kube-system --timeout=300s --for=condition=Available deploy/csi-nfs-controller
   args:
     executable: /bin/bash

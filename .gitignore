@@ -4,5 +4,14 @@ cluster/config/ssh/
 cluster/config/kubernetes/
 cluster/config/users
 cluster/samples/
-.buildportal/
 admin.conf
+.venv/
+.vscode/
+
+# Arquivos com credenciais reais (nunca commitar)
+*.vault
+vault_password
+vault_password_file
+.vault_pass
+.env
+*.pem

@@ -86,7 +86,7 @@ data:
       pos_file /var/log/fluentd.proxy-reverso.log.pos
       tag proxy-reverso
       read_from_head false
-      # exemplo: 2024-09-06T08:55:20.375546017-03:00 stdout F 200.18.32.7:30104 [06/Sep/2024:11:55:19.902] http~ desenv-host-backend/server1 0/0/0/471/471 200 1382 - - --NI 1/1/0/0/0 0/0 {desenv.portal.ufsm.br|2} {} "POST https://desenv.portal.ufsm.br/caixapostal/marcadoresDocumentos.json HTTP/2.0"
+      # exemplo: 2024-09-06T08:55:20.375546017-03:00 stdout F 203.0.113.7:30104 [06/Sep/2024:11:55:19.902] http~ desenv-host-backend/server1 0/0/0/471/471 200 1382 - - --NI 1/1/0/0/0 0/0 {app.example.local|2} {} "POST https://app.example.local/endpoint HTTP/2.0"
       format /^(?<timestamp>[^\s]+) (?<stream>stdout|stderr) F (?<source_ip>[^\:]+):(?<source_port>[^\s]+) \[(?<timestamp2>[^\]]+)\] (?<proxy>\S+) (?<backend>\S+) (?<flags>[^{]+) {(?<info>[^}]+)} {(?<info2>[^}]+)} \"(?<method>[A-Z]+) (?<uri_proto>[^\:]+):\/\/(?<domain>[^\/\?]+)(?<path>[^\?]*)\??(?<qs>.*)? (?<protocol>[^\"]+)"$/
     </source>
     <match proxy-reverso>
@@ -128,7 +128,7 @@ data:
       pos_file /var/log/fluentd.proxy-tcp.log.pos
       tag proxy-tcp
       read_from_head false
-      # exemplo: 2024-09-06T07:56:30.888846087-03:00 stdout F 200.18.32.7:31962 [06/Sep/2024:10:53:40.235] proxy443 backend443/server1 1/1/170652 6419 -- 1/1/0/0/0 0/0
+      # exemplo: 2024-09-06T07:56:30.888846087-03:00 stdout F 203.0.113.7:31962 [06/Sep/2024:10:53:40.235] proxy443 backend443/server1 1/1/170652 6419 -- 1/1/0/0/0 0/0
       format /^(?<timestamp>[^\s]+) (?<stream>stdout|stderr) F (?<source_ip>[^\:]+):(?<source_port>[^\s]+) \[(?<timestamp2>[^\]]+)\] (?<proxy>\S+) (?<backend>\S+) (?<info>.*)$/
     </source>
     <match proxy-tcp>
@@ -496,7 +496,7 @@ spec:
         - name: FLUENT_ELASTICSEARCH_USER
           value: elastic
         - name: FLUENT_ELASTICSEARCH_PASSWORD
-          value: J#DEkUUxFOHNPOEQkMU9uZ0@2025
+          value: {{ EFK_LOGGING.elasticsearch.password }}
         image: evertonagilar/fluentd:1.0.1
         name: fluentd
         resources:
@@ -546,15 +546,15 @@ spec:
       - effect: NoSchedule
         key: node-role.kubernetes.io/control-plane
       - effect: NoSchedule
-        key: ufsm.br.proxy-tcp
+        key: k8s.local/proxy-tcp
         operator: Equal
         value: "true"
       - effect: NoSchedule
-        key: ufsm.br.proxy-reverso
+        key: k8s.local/proxy-reverso
         operator: Equal
         value: "true"
       - effect: NoSchedule
-        key: ufsm.br.wportal-producao
+        key: k8s.local/wportal-producao
         operator: Equal
         value: "true"
       volumes:

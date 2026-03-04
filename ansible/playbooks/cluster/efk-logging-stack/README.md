@@ -4,14 +4,14 @@
 
 ```bash
 kubectl --namespace=efk-logging port-forward es-cluster-0 9200:9200 
-curl -k -u elastic:J#DEkUUxFOHNPOEQkMU9uZ0@2025 https://localhost:9200
+curl -k -u elastic:changeme https://localhost:9200
 ```
 
 2. Com pod na namespace diagnostico
 
 ```bash
 k -n diagnostico run -it ubuntu --image=evertonagilar/ubuntu
-curl -k -u elastic:J#DEkUUxFOHNPOEQkMU9uZ0@2025 https://es-cluster-0.elasticsearch.efk-logging.svc.cluster.local:9200
+curl -k -u elastic:changeme https://es-cluster-0.elasticsearch.efk-logging.svc.cluster.local:9200
 ```
 
 

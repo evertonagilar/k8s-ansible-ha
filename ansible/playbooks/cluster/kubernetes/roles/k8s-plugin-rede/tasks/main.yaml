@@ -14,6 +14,6 @@
   when: cluster_stat.stat.exists
 
 - name: Aguardar plugin de rede ficar pronto
-  shell: kubectl --kubeconfig=/etc/kubernetes/admin.conf wait --timeout=-1s --for=condition=Ready pod --all -n kube-system
+  shell: kubectl --kubeconfig=/etc/kubernetes/admin.conf wait -n kube-system --timeout=300s --for=condition=Available deploy/calico-kube-controllers
   args:
     executable: /bin/bash

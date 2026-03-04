@@ -40,9 +40,9 @@ spec:
 #            - name: ELASTICSEARCH_USERNAME
 #              value: "elastic"
 #            - name: ELASTICSEARCH_PASSWORD
-#              value: "J#DEkUUxFOHNPOEQkMU9uZ0@2025"
+#              value: "changeme"
 #            - name: SERVER_PUBLICBASEURL
-#              value: "https://kibana.k8s.si.ufsm.br"
+#              value: "https://kibana.k8s.local.br"
           ports:
             - containerPort: 5601
           volumeMounts:

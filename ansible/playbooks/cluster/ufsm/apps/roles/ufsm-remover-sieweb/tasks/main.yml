@@ -1,7 +1,0 @@
----
-- name: Remover {{ NAMESPACE_SIEWEB }}
-  kubernetes.core.k8s:
-    name: "{{ NAMESPACE_SIEWEB }}"
-    api_version: v1
-    kind: Namespace
-    state: present

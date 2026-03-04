@@ -1,6 +1,6 @@
 # Projeto de Cluster Kubernetes em Alta Disponibilidade (HA)
 
-Este projeto automatiza o provisionamento (IaC) de um cluster Kubernetes altamente disponível, utilizando **Vagrant** para o gerenciamento das máquinas virtuais (VirtualBox) e **Ansible** para a configuração e orquestração do software.
+Este projeto automatiza o provisionamento (IaC) de um cluster Kubernetes em HA com keepalive, utilizando **Vagrant** para o gerenciamento das máquinas virtuais (VirtualBox) e **Ansible** para a configuração e orquestração do software.
 
 ## Arquitetura do Cluster
 

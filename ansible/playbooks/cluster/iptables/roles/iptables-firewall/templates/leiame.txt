@@ -1,6 +1,6 @@
 ATENÇÃO
 ========================
-Autor: Everton de Vargas Agilar <evertonagilar@ufsm.br>
+Autor: Everton de Vargas Agilar <{{ CLUSTER_ADMIN.email }}>
 
 O script é carregado pelo serviço firewall-k8s-cpd.service quando a máquina é ligada.
 

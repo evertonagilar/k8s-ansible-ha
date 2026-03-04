@@ -18,15 +18,15 @@ spec:
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           effect: NoSchedule
-        - key: "ufsm.br.proxy-tcp"
+        - key: "k8s.local/proxy-tcp"
           operator: "Equal"
           value: "true"
           effect: "NoSchedule"
-        - key: "ufsm.br.proxy-reverso"
+        - key: "k8s.local/proxy-reverso"
           operator: "Equal"
           value: "true"
           effect: "NoSchedule"
-        - key: "ufsm.br.wportal-producao"
+        - key: "k8s.local/wportal-producao"
           operator: "Equal"
           value: "true"
           effect: "NoSchedule"
@@ -79,7 +79,7 @@ spec:
             - name: FLUENT_ELASTICSEARCH_USER
               value: "elastic"
             - name: FLUENT_ELASTICSEARCH_PASSWORD
-              value: "J#DEkUUxFOHNPOEQkMU9uZ0@2025"
+              value: "{{ EFK_LOGGING.elasticsearch.password }}"
 #            - name: FLUENTD_SYSTEMD_CONF
 #              value: disable
           resources:

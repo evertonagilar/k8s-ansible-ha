@@ -1,4 +1,14 @@
 ---
+- name: Instalar Helm nos controlplanes
+  hosts: controlplane_init
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - helm
+  tags:
+    - helm
+
 - name: Provisionar ingress nginx no Kubernetes
   hosts: controlplane_init
   become: yes

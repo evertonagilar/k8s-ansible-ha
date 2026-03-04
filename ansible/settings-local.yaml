@@ -15,10 +15,15 @@ VM_HELM_VERSION: "v3.19.0"
 VM_CSI_DRIVER_NFS_VERSION: "v4.7.0"
 VM_AMBIENTE: "local"
 
+# Administrador do cluster
+CLUSTER_ADMIN:
+  username: your-username
+  email: your-email@example.com
+
 # Keepalived
 VM_VIRTUAL_IP: "192.168.20.10"
 VM_VRRP_INTERFACE: eth1
-VM_VRRP_PASSWD: IliKeK8s
+VM_VRRP_PASSWD: changeme
 
 KUBELET:
   container_log_max_size: "100Ki"
@@ -49,13 +54,13 @@ hosts_entries:
 CERT_MANAGER:
   url: https://github.com/cert-manager/cert-manager/releases/download/v1.15.1/cert-manager.yaml
   acme:
-    email: evertonagilar@gmail.com
+    email: "{{ CLUSTER_ADMIN.email }}"
 
 ARGOCD:
   url: "https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml"
   urlCLI: "https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64"
   username: admin
-  password: i9WaGYe5aC5eRVt2
+  password: changeme
   ingress:
     clusterIssuer: letsencrypt-staging
     secretName: argocd-staging-tls
@@ -76,6 +81,9 @@ EFK_LOGGING:
   elasticsearch:
     nodeName: vm-worker-01
     volumePath: "{{ VOLUME_BASE_PATH }}/local/elasticsearch"
+    password: changeme
+    service_account_token: your-elasticsearch-service-account-token
+    ca_trusted_fingerprint: your-ca-trusted-fingerprint
   kibana:
     nodeName: vm-worker-01
     volumePath: "{{ VOLUME_BASE_PATH }}/local/kibana"
@@ -89,14 +97,22 @@ EFK_LOGGING:
 METALLB:
   url: "https://raw.githubusercontent.com/metallb/metallb/v0.14.4/config/manifests/metallb-native.yaml"
 
+# CIDRs com acesso administrativo ao cluster (usados no whitelist do loadbalancer e iptables)
+NETWORK:
+  admin_cidrs:
+    - cidr: 203.0.113.0/24
+      comment: Rede interna
+    - cidr: 203.0.113.16/28
+      comment: Rede DMZ
+
 ###################################### Repositórios #########################################################
 
 # Gitlab
 GITLAB:
   user: builder
-  host: alpha.cpd.ufsm.br
-  workspace: devops/kubernetes/project-manifests
-  token: glpat-djR1iYaezWsfZm64uib1
+  host: your-gitlab-host.example.com
+  workspace: your-group/your-project-manifests
+  token: your-gitlab-token
 
 REPO_SIEWEB:
   repo: https://{{ GITLAB.user }}:{{ GITLAB.token }}@{{ GITLAB.host }}/{{ GITLAB.workspace }}/k8s-sieweb.git
@@ -177,8 +193,8 @@ IPTABLES:
         - ip: 192.168.20.0/24
           comment: Rede externa vagrant (eth1)
           nodes: all
-        - ip: 200.18.32.0/24
-          comment: Rede interna CPD
+        - ip: 203.0.113.0/24
+          comment: Rede interna
           audit: yes
           rateLimit:
             # Rate limit
@@ -193,10 +209,10 @@ IPTABLES:
       description: Permitir HTTP/HTTPS
       from:
         ip_src:
-        - ip: 200.18.32.7/32
-          comment: Everton Agilar CPD
+        - ip: 203.0.113.7/32
+          comment: Admin
           nodes: all
-        - ip: 200.18.32.0/24 # rede interna CPD
+        - ip: 203.0.113.0/24 # rede interna
           comment: rede interna do CPD
           nodes: proxy
           rateLimit:
@@ -207,8 +223,8 @@ IPTABLES:
           comment: Rede externa vagrant (eth1)
           nodes: all
         mac_src:
-        - addr: b8:08:cf:fc:0e:5e
-          comment: Everton Agilar Casa
+        - addr: 00:00:00:00:00:00
+          comment: Admin Home
           nodes: all
 
     ssh:
@@ -223,8 +239,8 @@ IPTABLES:
         - ip: 192.168.20.0/24
           comment: Rede externa vagrant (eth1)
           nodes: all
-        - ip: 200.18.32.7/32
-          comment: Everton Agilar
+        - ip: 203.0.113.7/32
+          comment: Admin
           nodes: all
         - ip: 192.168.20.9/32
           comment: Servidor Ansible
@@ -235,12 +251,12 @@ IPTABLES:
       description: Admins do cluster
       from:
         ip_src:
-        - ip: 200.18.32.7/32
-          comment: Everton Agilar
+        - ip: 203.0.113.7/32
+          comment: Admin
           nodes: all
           audit: yes
         - ip: 192.168.100.20/32
-          comment: Everton Agilar - PC Casa
+          comment: Admin - PC Casa
           nodes: all
         - ip: 192.168.20.9/32
           comment: Servidor Ansible
@@ -290,8 +306,8 @@ IPTABLES:
         - ip: all
           comment: nodes
           nodes: controlplane
-        - ip: 200.18.32.7/32
-          comment: Everton Agilar
+        - ip: 203.0.113.7/32
+          comment: Admin
           nodes: controlplane
         - ip: 192.168.20.0/24
           comment: Rede externa vagrant (eth1)
@@ -303,10 +319,10 @@ IPTABLES:
       description: Permitir acesso ao ingress
       from:
         ip_src:
-        - ip: 200.18.33.0/24
+        - ip: 203.0.113.16/28
           comment: Rede DMZ
           nodes: all
-        - ip: 200.18.32.0/24
+        - ip: 203.0.113.0/24
           comment: Rede interna
           nodes: all
 
