@@ -1,33 +1,10 @@
 # Projeto de Cluster Kubernetes em Alta Disponibilidade (HA)
 
-Este projeto automatiza o provisionamento (IaC) de um cluster Kubernetes em HA com keepalive, utilizando **Vagrant** para o gerenciamento das máquinas virtuais (VirtualBox) e **Ansible** para a configuração e orquestração do software.
-
-## Arquitetura do Cluster
-
-O ambiente é composto por **7 Máquinas Virtuais** interconectadas através de uma rede privada interna:
-
-*   **Host Gateway/Firewall**: Atua como roteador NAT para fornecer acesso à internet para o cluster.
-*   **3 Control Planes**: Nós mestres do Kubernetes configurados com **Keepalived** para prover um IP Virtual (VIP) de alta disponibilidade para a API Server.
-*   **3 Workers**: Nós onde as cargas de trabalho (Pods) são executadas.
-
-### Topologia de Rede (Default)
-
-*   **Rede Interna:** `192.168.20.0/24`
-*   **VIP do Control Plane:** `192.168.20.10`
-
-| Hostname             | IP              | Função                |
-| :------------------- | :-------------- | :-------------------- |
-| `vm-proxyfw`         | `192.168.20.8`  | Gateway NAT / Firewall|
-| `vm-controlplane-01` | `192.168.20.11` | Master 1              |
-| `vm-controlplane-02` | `192.168.20.12` | Master 2              |
-| `vm-controlplane-03` | `192.168.20.13` | Master 3              |
-| `vm-worker-01`       | `192.168.20.16` | Worker 1              |
-| `vm-worker-02`       | `192.168.20.17` | Worker 2              |
-| `vm-worker-03`       | `192.168.20.18` | Worker 3              |
+Este projeto automatiza o provisionamento (IaC) de um cluster Kubernetes em HA com KUBEADM e keepalive, utilizando **Ansible** para a configuração e orquestração do software necessário.
 
 ## Pré-requisitos
 
-Para executar este projeto, você precisará instalar em sua máquina local:
+Para executar este projeto localmente, você precisará instalar:
 
 1.  **[VirtualBox](https://www.virtualbox.org/)**: Hypervisor para rodar as VMs.
 2.  **[Vagrant](https://www.vagrantup.com/)**: Gerenciador de ambientes virtuais.
